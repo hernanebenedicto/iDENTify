@@ -1,48 +1,38 @@
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
-export default function SelectDateTime() {
-  const { doctor, service } = useLocalSearchParams();
+export default function SelectService() {
+  const { service } = useLocalSearchParams();
   const router = useRouter();
-
-  const dates = ["March 14", "March 15", "March 16"];
-  const times = ["9:00 AM", "10:00 AM", "2:00 PM"];
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Choose Date & Time</Text>
-
-      <Text style={styles.subheading}>Doctor: {doctor}</Text>
-      <Text style={styles.subheading}>Service: {service}</Text>
-
-      <Text style={styles.label}>Choose a date:</Text>
-      {dates.map((d, i) => (
-        <TouchableOpacity
-          key={i}
-          style={styles.option}
-          onPress={() =>
-            router.push(
-              `/appointments/select-datetime?doctor=${doctor}&service=${service}&date=${d}`
-            )
-          }
-        >
-          <Text>{d}</Text>
-        </TouchableOpacity>
-      ))}
+       <Text style={styles.title}>Service Selected</Text>
+       <Text style={styles.subtitle}>{service}</Text>
+       
+       <TouchableOpacity 
+         style={styles.button}
+         onPress={() => router.push(`/appointments/select-doctor?service=${service}`)}
+       >
+         <Text style={styles.btnText}>Find a Doctor</Text>
+         <Ionicons name="arrow-forward" size={20} color="white" />
+       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20 },
-  title: { fontSize: 26, fontWeight: "700", marginBottom: 10 },
-  subheading: { fontSize: 16, color: "#666", marginBottom: 5 },
-  label: { marginTop: 20, marginBottom: 10, fontSize: 16, fontWeight: "600" },
-  option: {
-    padding: 14,
-    backgroundColor: "white",
-    marginBottom: 10,
-    borderRadius: 10,
-    elevation: 1,
+  container: { flex: 1, padding: 20, justifyContent: 'center', alignItems: 'center' },
+  title: { fontSize: 28, fontWeight: '700' },
+  subtitle: { fontSize: 20, color: '#1B93D5', marginVertical: 20 },
+  button: {
+    flexDirection: 'row',
+    backgroundColor: '#1B93D5',
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 30,
+    alignItems: 'center'
   },
+  btnText: { color: 'white', fontSize: 18, fontWeight: '600', marginRight: 10 }
 });

@@ -1,92 +1,252 @@
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from "react-native";
 import { useUser, useAuth } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useEffect, useState } from "react";
+import { fetchPatientByEmail } from "../../constants/Api";
 
 export default function ProfileScreen() {
   const { user } = useUser();
   const { signOut } = useAuth();
   const router = useRouter();
+  const [patientData, setPatientData] = useState(null);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (user?.primaryEmailAddress?.emailAddress) {
+        const data = await fetchPatientByEmail(user.primaryEmailAddress.emailAddress);
+        setPatientData(data);
+      }
+    };
+    loadProfile();
+  }, [user]);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>My Profile</Text>
-      <View style={styles.card}>
-        <Ionicons name="person-circle-outline" size={70} color="#1B93D5" />
-        <Text style={styles.name}>{user?.fullName || "Unnamed User"}</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      {/* HEADER SECTION */}
+      <View style={styles.header}>
+        <View style={styles.avatarContainer}>
+          <Ionicons name="person" size={48} color="#1B93D5" />
+        </View>
+        <Text style={styles.name}>
+          {patientData?.full_name || user?.fullName || "Guest"}
+        </Text>
         <Text style={styles.email}>
           {user?.primaryEmailAddress?.emailAddress}
         </Text>
+        {patientData?.contact_number && (
+          <View style={styles.contactBadge}>
+            <Ionicons name="call-outline" size={14} color="#64748B" />
+            <Text style={styles.contactText}>{patientData.contact_number}</Text>
+          </View>
+        )}
       </View>
-      <TouchableOpacity
-        style={styles.option}
-        onPress={() => router.push("/profile/edit")}
+
+      {/* MENU SECTION */}
+      <Text style={styles.sectionTitle}>Account Settings</Text>
+      
+      <View style={styles.menuContainer}>
+        <TouchableOpacity
+          style={styles.menuItem}
+          activeOpacity={0.7}
+          onPress={() => router.push("/profile/edit")}
+        >
+          <View style={[styles.iconBox, { backgroundColor: "#E0F2FE" }]}>
+            <Ionicons name="person-outline" size={22} color="#0284C7" />
+          </View>
+          <Text style={styles.menuText}>Edit Profile</Text>
+          <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
+        </TouchableOpacity>
+
+        <View style={styles.divider} />
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          activeOpacity={0.7}
+          onPress={() => router.push("/profile/family")}
+        >
+          <View style={[styles.iconBox, { backgroundColor: "#FCE7F3" }]}>
+            <Ionicons name="people-outline" size={22} color="#DB2777" />
+          </View>
+          <Text style={styles.menuText}>Family Members</Text>
+          <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.sectionTitle}>App Settings</Text>
+      
+      <View style={styles.menuContainer}>
+        {/* <TouchableOpacity
+          style={styles.menuItem}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.iconBox, { backgroundColor: "#DCFCE7" }]}>
+            <Ionicons name="notifications-outline" size={22} color="#16A34A" />
+          </View>
+          <Text style={styles.menuText}>Notifications</Text>
+          <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
+        </TouchableOpacity>
+         */}
+        <View style={styles.divider} />
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.iconBox, { backgroundColor: "#FEF3C7" }]}>
+            <Ionicons name="help-circle-outline" size={22} color="#D97706" />
+          </View>
+          <Text style={styles.menuText}>Help & Support</Text>
+          <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
+        </TouchableOpacity>
+      </View>
+
+      {/* LOGOUT BUTTON */}
+      <TouchableOpacity 
+        style={styles.logoutBtn} 
+        onPress={signOut}
+        activeOpacity={0.8}
       >
-        <Ionicons name="create-outline" size={22} color="#1B93D5" />
-        <Text style={styles.optionText}>Edit Profile</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.option}
-        onPress={() => router.push("/profile/family")}
-      >
-        <Ionicons name="people-outline" size={22} color="#1B93D5" />
-        <Text style={styles.optionText}>Family Members</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.logoutBtn} onPress={signOut}>
+        <Ionicons name="log-out-outline" size={20} color="#EF4444" />
         <Text style={styles.logoutText}>Log Out</Text>
       </TouchableOpacity>
-    </View>
+      
+      <Text style={styles.versionText}>Version 1.0.0</Text>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#F4F8FF" },
-
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    marginBottom: 20,
-    color: "#333",
+  container: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+  contentContainer: {
+    padding: 24,
+    paddingTop: 40,
   },
 
-  card: {
-    backgroundColor: "white",
-    padding: 20,
-    borderRadius: 14,
+  /* HEADER STYLES */
+  header: {
     alignItems: "center",
-    elevation: 2,
-    marginBottom: 30,
+    marginBottom: 32,
   },
-
-  name: { fontSize: 22, fontWeight: "700", marginTop: 10 },
-  email: { color: "#555", marginTop: 4 },
-
-  option: {
-    flexDirection: "row",
-    backgroundColor: "white",
-    padding: 16,
-    borderRadius: 12,
-    elevation: 2,
+  avatarContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#F0F9FF",
+    justifyContent: "center",
     alignItems: "center",
+    marginBottom: 16,
+    borderWidth: 4,
+    borderColor: "white",
+    shadowColor: "#1B93D5",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  name: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#1E293B",
+    marginBottom: 4,
+    letterSpacing: -0.5,
+  },
+  email: {
+    fontSize: 15,
+    color: "#64748B",
     marginBottom: 12,
   },
-
-  optionText: {
-    marginLeft: 10,
-    fontSize: 16,
+  contactBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  contactText: {
+    fontSize: 13,
+    color: "#475569",
     fontWeight: "600",
   },
 
-  logoutBtn: {
-    backgroundColor: "#e74c3c",
-    padding: 14,
-    borderRadius: 10,
-    marginTop: 20,
+  /* SECTION TITLES */
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#94A3B8",
+    marginBottom: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginLeft: 4,
   },
 
+  /* MENU CONTAINER */
+  menuContainer: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    paddingVertical: 8,
+    marginBottom: 24,
+    shadowColor: "#64748B",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  menuText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#334155",
+    flex: 1,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#F1F5F9",
+    marginLeft: 72, // Align with text start
+  },
+
+  /* LOGOUT BUTTON */
+  logoutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FEF2F2",
+    paddingVertical: 16,
+    borderRadius: 16,
+    marginBottom: 20,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+  },
   logoutText: {
-    color: "white",
+    fontSize: 16,
     fontWeight: "700",
+    color: "#EF4444",
+  },
+  versionText: {
     textAlign: "center",
+    color: "#CBD5E1",
+    fontSize: 13,
+    marginBottom: 20,
   },
 });

@@ -8,26 +8,38 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  Alert
 } from "react-native";
 import { useSignUp } from "@clerk/clerk-expo";
 import { Link, useRouter } from "expo-router";
+// Ensure relative path is correct: ../../ points to root from app/(auth)/
+import { API } from "../../constants/Api"; 
 
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
   const router = useRouter();
 
+  const [fullName, setFullName] = useState("");
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
   const [pendingVerification, setPendingVerification] = useState(false);
   const [code, setCode] = useState("");
 
+  // Step 1: Create Account in Clerk & Send Email
   const onSignUpPress = async () => {
     if (!isLoaded) return;
 
+    if (!fullName.trim()) {
+      Alert.alert("Error", "Please enter your full name.");
+      return;
+    }
+
     try {
       await signUp.create({
-        emailAddress: emailAddress.trim().toLowerCase(),
+        emailAddress: emailAddress.trim(),
         password,
+        firstName: fullName.split(" ")[0],
+        lastName: fullName.split(" ").slice(1).join(" "),
       });
 
       await signUp.prepareEmailAddressVerification({
@@ -37,9 +49,11 @@ export default function SignUpScreen() {
       setPendingVerification(true);
     } catch (err) {
       console.error(JSON.stringify(err, null, 2));
+      Alert.alert("Sign Up Error", err.errors ? err.errors[0].message : "Something went wrong");
     }
   };
 
+  // Step 2: Verify Email & Create Patient in MySQL Database
   const onVerifyPress = async () => {
     if (!isLoaded) return;
 
@@ -49,13 +63,39 @@ export default function SignUpScreen() {
       });
 
       if (signUpAttempt.status === "complete") {
+        
+        // --- BACKEND CONNECTION START ---
+        // Create the patient in your MySQL database now that they are verified
+        try {
+          const res = await fetch(API.patients, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              full_name: fullName,
+              email: emailAddress.trim(),
+              address: "Update your profile", // Default values
+              contact_number: "",
+              gender: "Unspecified"
+            })
+          });
+          
+          if (!res.ok) {
+            console.error("Failed to create patient in DB");
+          }
+        } catch (dbError) {
+          console.error("Database Error:", dbError);
+          // We don't block login if DB fails, but we log it
+        }
+        // --- BACKEND CONNECTION END ---
+
         await setActive({ session: signUpAttempt.createdSessionId });
         router.replace("/");
       } else {
-        console.error(JSON.stringify(signUpAttempt, null, 2));
+        Alert.alert("Verification Failed", "Please check your code and try again.");
       }
     } catch (err) {
       console.error(JSON.stringify(err, null, 2));
+      Alert.alert("Error", "Verification failed.");
     }
   };
 
@@ -67,12 +107,14 @@ export default function SignUpScreen() {
       >
         <View style={styles.container}>
           <Text style={styles.verifyTitle}>Verify your email</Text>
+          <Text style={styles.subtitle}>Enter the code sent to {emailAddress}</Text>
 
           <TextInput
             value={code}
             placeholder="Enter verification code"
             onChangeText={setCode}
             style={styles.input}
+            keyboardType="number-pad"
           />
 
           <TouchableOpacity style={styles.button} onPress={onVerifyPress}>
@@ -95,6 +137,14 @@ export default function SignUpScreen() {
         <View style={styles.container}>
           <Text style={styles.appName}>iDENTify</Text>
           <Text style={styles.title}>Create Account</Text>
+
+          {/* Added Full Name Field */}
+          <TextInput
+            value={fullName}
+            placeholder="Full Name"
+            onChangeText={setFullName}
+            style={styles.input}
+          />
 
           <TextInput
             autoCapitalize="none"
@@ -163,7 +213,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textAlign: "center",
     color: "#1A7FCC",
-    marginBottom: 25,
+    marginBottom: 10,
+  },
+  
+  subtitle: {
+    textAlign: "center", 
+    color: "#666", 
+    marginBottom: 20
   },
 
   input: {
