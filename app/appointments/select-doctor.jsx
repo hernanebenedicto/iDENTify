@@ -1,38 +1,183 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { API } from "../../constants/Api";
 
-export default function SelectService() {
+export default function SelectDoctor() {
   const { service } = useLocalSearchParams();
   const router = useRouter();
+  const [doctors, setDoctors] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDoctors = async () => {
+      try {
+        const res = await fetch(API.dentists);
+        const data = await res.json();
+
+        // FIX: Filter out dentists who are "Off"
+        // We only show 'Available' or 'Busy' (Busy might still accept bookings depending on your rule, 
+        // but 'Off' definitely shouldn't be here).
+        const activeDoctors = data.filter(doc => doc.status !== 'Off');
+
+        setDoctors(activeDoctors);
+      } catch (error) {
+        console.error("Error fetching doctors", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDoctors();
+  }, []);
 
   return (
-    <View style={styles.container}>
-       <Text style={styles.title}>Service Selected</Text>
-       <Text style={styles.subtitle}>{service}</Text>
-       
-       <TouchableOpacity 
-         style={styles.button}
-         onPress={() => router.push(`/appointments/select-doctor?service=${service}`)}
-       >
-         <Text style={styles.btnText}>Find a Doctor</Text>
-         <Ionicons name="arrow-forward" size={20} color="white" />
-       </TouchableOpacity>
-    </View>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Choose a Specialist</Text>
+        <Text style={styles.subtitle}>for {service || "Appointment"}</Text>
+      </View>
+
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1B93D5" />
+        </View>
+      ) : doctors.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No dentists available at the moment.</Text>
+        </View>
+      ) : (
+        <View style={styles.listContainer}>
+          {doctors.map((doc) => (
+            <TouchableOpacity
+              key={doc.id}
+              style={styles.card}
+              activeOpacity={0.7}
+              onPress={() =>
+                router.push(
+                  `/appointments/select-datetime?doctor=${doc.name}&docId=${doc.id}&service=${service}`
+                )
+              }
+            >
+              <View style={styles.avatarContainer}>
+                <Ionicons name="person" size={24} color="#1B93D5" />
+              </View>
+
+              <View style={styles.infoContainer}>
+                <Text style={styles.cardTitle}>{doc.name}</Text>
+                <Text style={styles.cardSubtitle}>{doc.specialization || "General Dentist"}</Text>
+              </View>
+
+              {/* Show Busy Tag if status is Busy */}
+              {doc.status === 'Busy' && (
+                <View style={styles.busyBadge}>
+                  <Text style={styles.busyText}>Busy</Text>
+                </View>
+              )}
+
+              <View style={styles.arrowContainer}>
+                <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 28, fontWeight: '700' },
-  subtitle: { fontSize: 20, color: '#1B93D5', marginVertical: 20 },
-  button: {
-    flexDirection: 'row',
-    backgroundColor: '#1B93D5',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 30,
-    alignItems: 'center'
+  container: {
+    flex: 1,
+    backgroundColor: "#F8FAFC"
   },
-  btnText: { color: 'white', fontSize: 18, fontWeight: '600', marginRight: 10 }
+  contentContainer: {
+    padding: 24,
+    paddingTop: 40,
+  },
+  header: {
+    marginBottom: 32,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#1E293B",
+    marginBottom: 4,
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#64748B",
+    fontWeight: "500"
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#94A3B8",
+    fontStyle: 'italic'
+  },
+  listContainer: {
+    gap: 16,
+  },
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    padding: 20,
+    borderRadius: 20,
+    shadowColor: "#64748B",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  avatarContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 20,
+    backgroundColor: "#F0F9FF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  infoContainer: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1E293B",
+    marginBottom: 4,
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+  arrowContainer: {
+    paddingLeft: 8,
+  },
+  busyBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    marginRight: 8
+  },
+  busyText: {
+    color: '#D97706',
+    fontSize: 12,
+    fontWeight: '700'
+  }
 });

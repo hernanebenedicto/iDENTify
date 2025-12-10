@@ -17,6 +17,14 @@ import { useFocusEffect } from "expo-router";
 import { API, fetchPatientByEmail } from "../../constants/Api";
 import { dentalServices } from "../../constants/services";
 
+// HELPER: Fix Date format for Mobile (Space -> T)
+const parseDate = (dateString) => {
+  if (!dateString) return new Date();
+  // Converts "2025-11-28 09:00:00" -> "2025-11-28T09:00:00"
+  // React Native (Hermes) needs the 'T' separator to parse correctly
+  return new Date(dateString.replace(" ", "T"));
+};
+
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useUser();
@@ -41,16 +49,20 @@ export default function HomeScreen() {
         const res = await fetch(`${API.appointments}?patient_id=${patientData.id}`);
         const allAppts = await res.json();
 
+        // Get start of today (Midnight)
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
         const myAppts = allAppts
-          .filter(
-            (a) =>
-              new Date(a.appointment_datetime) > new Date() &&
-              a.status !== 'Done' && a.status !== 'Cancelled'
-          )
-          .sort(
-            (a, b) =>
-              new Date(a.appointment_datetime) - new Date(b.appointment_datetime)
-          );
+          .filter((a) => {
+            // FIX: Show appointments if they are Today or Future (ignore specific time passed)
+            // AND ensure they are not Done/Cancelled
+            const apptDate = parseDate(a.appointment_datetime);
+            return apptDate >= todayStart && a.status !== 'Done' && a.status !== 'Cancelled';
+          })
+          .sort((a, b) => {
+            return parseDate(a.appointment_datetime) - parseDate(b.appointment_datetime);
+          });
 
         setUpcomingAppt(myAppts.length > 0 ? myAppts[0] : null);
       }
@@ -139,11 +151,11 @@ export default function HomeScreen() {
               <View style={styles.heroTimeInfo}>
                 <Ionicons name="time-outline" size={18} color="rgba(255,255,255,0.9)" />
                 <Text style={styles.heroFooterText}>
-                  {new Date(upcomingAppt.appointment_datetime).toLocaleDateString(undefined, {
+                  {parseDate(upcomingAppt.appointment_datetime).toLocaleDateString(undefined, {
                     weekday: 'short', month: 'short', day: 'numeric'
                   })}
                   {' • '}
-                  {new Date(upcomingAppt.appointment_datetime).toLocaleTimeString([], {
+                  {parseDate(upcomingAppt.appointment_datetime).toLocaleTimeString([], {
                     hour: '2-digit', minute: '2-digit'
                   })}
                 </Text>
@@ -241,15 +253,15 @@ export default function HomeScreen() {
                   <Text style={styles.textStyle}>Close</Text>
                 </Pressable>
 
-                <Pressable
+                {/* <Pressable
                   style={{ marginTop: 15 }}
                   onPress={() => {
                     setModalVisible(false);
-                    router.push("/appointments/book");
+                    router.push("/appointments/select-doctor");
                   }}
                 >
                   <Text style={{ color: '#1B93D5', fontWeight: 'bold' }}>Book This Service</Text>
-                </Pressable>
+                </Pressable> */}
               </>
             )}
           </View>

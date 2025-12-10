@@ -22,25 +22,27 @@ export default function EditProfile() {
   const { user } = useUser();
   const router = useRouter();
 
-  // --- STATES FOR SPLIT FIELDS ---
   const [givenName, setGivenName] = useState("");
   const [middleName, setMiddleName] = useState("");
   const [lastName, setLastName] = useState("");
   const [sex, setSex] = useState("");
-  const [bday, setBday] = useState(""); // Display string (YYYY-MM-DD)
-  const [dateObject, setDateObject] = useState(new Date()); // Date object for Picker
+  const [bday, setBday] = useState("");
+  const [dateObject, setDateObject] = useState(new Date());
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [displayAge, setDisplayAge] = useState(""); // Auto-calculated age
+  const [email, setEmail] = useState(""); // Added Email
+  const [displayAge, setDisplayAge] = useState("");
+
+  // Preservation States (Data we don't edit but must keep)
+  const [medicalAlerts, setMedicalAlerts] = useState([]);
+  const [xrays, setXrays] = useState([]);
+  const [parentId, setParentId] = useState(null);
 
   const [patient, setPatient] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Modals
-  const [modalVisible, setModalVisible] = useState(false); // Sex Dropdown
-  const [showDatePicker, setShowDatePicker] = useState(false); // Date Picker
-
-  // 1. LOAD DATA & SPLIT NAME
   useEffect(() => {
     const loadPatientData = async () => {
       if (!user) return;
@@ -50,7 +52,6 @@ export default function EditProfile() {
         if (data) {
           setPatient(data);
 
-          // Split Full Name from DB into 3 parts
           const nameParts = (data.full_name || "").split(" ");
           if (nameParts.length > 0) setGivenName(nameParts[0]);
           if (nameParts.length === 2) {
@@ -63,8 +64,13 @@ export default function EditProfile() {
           setSex(data.gender || "");
           setPhone(data.contact_number || "");
           setAddress(data.address || "");
+          setEmail(data.email || "");
 
-          // Format Date & Age
+          // Preserve hidden fields
+          setMedicalAlerts(data.medical_alerts || []);
+          setXrays(data.xrays || []);
+          setParentId(data.parent_id || null);
+
           if (data.birthdate) {
             const d = new Date(data.birthdate);
             setBday(d.toISOString().split('T')[0]);
@@ -74,8 +80,7 @@ export default function EditProfile() {
           }
         }
       } catch (error) {
-        console.error("Failed to load patient data", error);
-        Alert.alert("Error", "Could not load your profile data.");
+        Alert.alert("Error", "Could not load profile.");
       } finally {
         setLoading(false);
       }
@@ -83,21 +88,16 @@ export default function EditProfile() {
     loadPatientData();
   }, [user]);
 
-  // Helper: Calculate Age
   const calculateAge = (birthDate) => {
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
     const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
     return age;
   };
 
-  // Handle Date Selection
   const onChangeDate = (event, selectedDate) => {
     if (Platform.OS === 'android') setShowDatePicker(false);
-
     if (selectedDate) {
       setDateObject(selectedDate);
       setBday(selectedDate.toISOString().split('T')[0]);
@@ -110,12 +110,11 @@ export default function EditProfile() {
     if (!patient) return;
     setLoading(true);
 
-    // 1. Re-combine names for MySQL Database (needs 1 string)
     const fullNameCombined = `${givenName} ${middleName} ${lastName}`.replace(/\s+/g, " ").trim();
     const calculatedAge = calculateAge(dateObject);
 
     try {
-      // 2. Update MySQL Database
+      // FULL PROOF UPDATE: Include ALL fields so nothing is lost
       const res = await fetch(`${API.patients}/${patient.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -125,13 +124,16 @@ export default function EditProfile() {
           birthdate: bday,
           contact_number: phone,
           address: address,
+          email: email, // Critical fix
+          medicalAlerts: medicalAlerts, // Critical fix
+          xrays: xrays, // Critical fix
+          parent_id: parentId,
           vitals: { ...patient.vitals, age: calculatedAge }
         }),
       });
 
       if (!res.ok) throw new Error("Failed to update profile database.");
 
-      // 3. Update Clerk User (FIX: Send firstName/lastName separately)
       await user.update({
         firstName: givenName,
         lastName: `${middleName ? middleName + " " : ""}${lastName}`.trim()
@@ -141,23 +143,18 @@ export default function EditProfile() {
       router.back();
     } catch (error) {
       console.error(error);
-      Alert.alert("Error", "Failed to save changes: " + error.message);
+      Alert.alert("Error", "Failed to save changes.");
     } finally {
       setLoading(false);
     }
   };
 
   if (loading && !patient) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1B93D5" />
-      </View>
-    );
+    return <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#1B93D5" /></View>;
   }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1E293B" />
@@ -166,49 +163,28 @@ export default function EditProfile() {
         <View style={{ width: 24 }} />
       </View>
 
-      {/* Avatar */}
       <View style={styles.avatarContainer}>
         <View style={styles.avatarCircle}>
           <Ionicons name="person" size={50} color="white" />
         </View>
       </View>
 
-      {/* Form Fields */}
       <View style={styles.formGroup}>
         <Text style={styles.label}>Given name</Text>
-        <TextInput
-          style={styles.input}
-          value={givenName}
-          onChangeText={setGivenName}
-          placeholder="First Name"
-        />
+        <TextInput style={styles.input} value={givenName} onChangeText={setGivenName} placeholder="First Name" />
 
         <Text style={styles.label}>Middle name(optional)</Text>
-        <TextInput
-          style={styles.input}
-          value={middleName}
-          onChangeText={setMiddleName}
-          placeholder="Middle Name"
-        />
+        <TextInput style={styles.input} value={middleName} onChangeText={setMiddleName} placeholder="Middle Name" />
 
         <Text style={styles.label}>Last name</Text>
-        <TextInput
-          style={styles.input}
-          value={lastName}
-          onChangeText={setLastName}
-          placeholder="Last Name"
-        />
+        <TextInput style={styles.input} value={lastName} onChangeText={setLastName} placeholder="Last Name" />
 
-        {/* Sex Dropdown */}
         <Text style={styles.label}>Sex</Text>
         <TouchableOpacity style={styles.input} onPress={() => setModalVisible(true)}>
-          <Text style={{ color: sex ? '#1E293B' : '#aaa' }}>
-            {sex || "Select Sex"}
-          </Text>
+          <Text style={{ color: sex ? '#1E293B' : '#aaa' }}>{sex || "Select Sex"}</Text>
           <Ionicons name="chevron-down" size={20} color="#666" style={{ position: 'absolute', right: 15, top: 14 }} />
         </TouchableOpacity>
 
-        {/* Bday DatePicker */}
         <Text style={styles.label}>Birthday</Text>
         <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
           {bday ? (
@@ -222,7 +198,6 @@ export default function EditProfile() {
           <Ionicons name="calendar-outline" size={20} color="#666" style={{ position: 'absolute', right: 15, top: 14 }} />
         </TouchableOpacity>
 
-        {/* Native Date Picker Component */}
         {showDatePicker && (
           <DateTimePicker
             testID="dateTimePicker"
@@ -241,102 +216,54 @@ export default function EditProfile() {
         )}
 
         <Text style={styles.label}>Phone number</Text>
-        <TextInput
-          style={styles.input}
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-          placeholder="0917..."
-        />
+        <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="0917..." />
+
+        {/* ADDED EMAIL FIELD */}
+        <Text style={styles.label}>Email Address</Text>
+        <TextInput style={[styles.input, { backgroundColor: '#F1F5F9' }]} value={email} editable={false} placeholder="Email" />
+        <Text style={{ fontSize: 11, color: '#888', marginTop: -12, marginBottom: 16, marginLeft: 4 }}>Email cannot be changed here.</Text>
 
         <Text style={styles.label}>Address</Text>
-        <TextInput
-          style={styles.input}
-          value={address}
-          onChangeText={setAddress}
-          placeholder="Full Address"
-        />
+        <TextInput style={styles.input} value={address} onChangeText={setAddress} placeholder="Full Address" />
       </View>
 
-      {/* Save Button */}
       <TouchableOpacity style={styles.saveButton} onPress={saveChanges} disabled={loading}>
         {loading ? <ActivityIndicator color="white" /> : <Text style={styles.saveButtonText}>save changes</Text>}
       </TouchableOpacity>
 
-      {/* Sex Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
+      <Modal animationType="fade" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Select Sex</Text>
             {['Male', 'Female'].map((opt) => (
-              <TouchableOpacity
-                key={opt}
-                style={styles.modalOption}
-                onPress={() => { setSex(opt); setModalVisible(false); }}
-              >
+              <TouchableOpacity key={opt} style={styles.modalOption} onPress={() => { setSex(opt); setModalVisible(false); }}>
                 <Text style={styles.optionText}>{opt}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </Pressable>
       </Modal>
-
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F4F8FF",
-  },
-  scrollContent: {
-    padding: 24,
-    paddingTop: 60,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F4F8FF",
-  },
-
+  container: { flex: 1, backgroundColor: "#F4F8FF" },
+  scrollContent: { padding: 24, paddingTop: 60 },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F4F8FF" },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
   headerTitle: { fontSize: 20, fontWeight: "700", color: "#1E293B" },
-
   avatarContainer: { alignItems: "center", marginBottom: 30 },
-  avatarCircle: {
-    width: 90, height: 90, borderRadius: 45, backgroundColor: "#1B93D5",
-    justifyContent: "center", alignItems: "center",
-    shadowColor: "#1B93D5", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6
-  },
-
+  avatarCircle: { width: 90, height: 90, borderRadius: 45, backgroundColor: "#1B93D5", justifyContent: "center", alignItems: "center", shadowColor: "#1B93D5", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
   formGroup: { marginBottom: 20 },
   label: { fontSize: 14, fontWeight: "700", color: "#1E293B", marginBottom: 8, marginLeft: 4 },
-
-  input: {
-    backgroundColor: "#FFFFFF", borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16, marginBottom: 16,
-    fontSize: 15, color: "#1E293B", height: 50, justifyContent: 'center',
-    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
-  },
-
-  saveButton: {
-    backgroundColor: "#1B93D5", borderRadius: 12, paddingVertical: 16, alignItems: "center",
-    marginTop: 10, marginBottom: 40,
-    shadowColor: "#1B93D5", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4,
-  },
+  input: { backgroundColor: "#FFFFFF", borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16, marginBottom: 16, fontSize: 15, color: "#1E293B", height: 50, justifyContent: 'center', shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
+  saveButton: { backgroundColor: "#1B93D5", borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 10, marginBottom: 40, shadowColor: "#1B93D5", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
   saveButtonText: { color: "white", fontSize: 16, fontWeight: "700" },
-
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
   modalContent: { width: "80%", backgroundColor: "white", borderRadius: 16, padding: 20, elevation: 5 },
   modalTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 16, textAlign: "center" },
   modalOption: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" },
   optionText: { fontSize: 16, textAlign: "center", color: "#1B93D5" },
-
   iosDoneBtn: { alignSelf: 'flex-end', backgroundColor: '#1B93D5', padding: 8, borderRadius: 8, marginBottom: 10 }
 });
