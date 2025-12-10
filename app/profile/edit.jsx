@@ -6,39 +6,72 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  ScrollView,
+  Platform,
+  Modal,
+  Pressable
 } from "react-native";
 import { useUser } from "@clerk/clerk-expo";
 import { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { API, fetchPatientByEmail } from "../../constants/Api";
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function EditProfile() {
   const { user } = useUser();
   const router = useRouter();
 
-  // Form state
-  const [name, setName] = useState("");
+  // --- STATES FOR SPLIT FIELDS ---
+  const [givenName, setGivenName] = useState("");
+  const [middleName, setMiddleName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [sex, setSex] = useState("");
+  const [bday, setBday] = useState(""); // Display string (YYYY-MM-DD)
+  const [dateObject, setDateObject] = useState(new Date()); // Date object for Picker
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [displayAge, setDisplayAge] = useState(""); // Auto-calculated age
 
-  // Data state
   const [patient, setPatient] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Load profile data from our database when the component mounts
+  // Modals
+  const [modalVisible, setModalVisible] = useState(false); // Sex Dropdown
+  const [showDatePicker, setShowDatePicker] = useState(false); // Date Picker
+
+  // 1. LOAD DATA & SPLIT NAME
   useEffect(() => {
     const loadPatientData = async () => {
       if (!user) return;
       setLoading(true);
       try {
-        const patientData = await fetchPatientByEmail(
-          user.primaryEmailAddress.emailAddress
-        );
-        if (patientData) {
-          setPatient(patientData);
-          setName(patientData.full_name || "");
-          setPhone(patientData.contact_number || "");
-          setAddress(patientData.address || "");
+        const data = await fetchPatientByEmail(user.primaryEmailAddress.emailAddress);
+        if (data) {
+          setPatient(data);
+
+          // Split Full Name from DB into 3 parts
+          const nameParts = (data.full_name || "").split(" ");
+          if (nameParts.length > 0) setGivenName(nameParts[0]);
+          if (nameParts.length === 2) {
+            setLastName(nameParts[1]);
+          } else if (nameParts.length > 2) {
+            setLastName(nameParts[nameParts.length - 1]);
+            setMiddleName(nameParts.slice(1, -1).join(" "));
+          }
+
+          setSex(data.gender || "");
+          setPhone(data.contact_number || "");
+          setAddress(data.address || "");
+
+          // Format Date & Age
+          if (data.birthdate) {
+            const d = new Date(data.birthdate);
+            setBday(d.toISOString().split('T')[0]);
+            setDateObject(d);
+            const age = calculateAge(d);
+            setDisplayAge(`${age} years old`);
+          }
         }
       } catch (error) {
         console.error("Failed to load patient data", error);
@@ -50,122 +83,260 @@ export default function EditProfile() {
     loadPatientData();
   }, [user]);
 
-  const saveChanges = async () => {
-    if (!patient) {
-      Alert.alert("Error", "Could not find patient profile to update.");
-      return;
+  // Helper: Calculate Age
+  const calculateAge = (birthDate) => {
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
     }
+    return age;
+  };
+
+  // Handle Date Selection
+  const onChangeDate = (event, selectedDate) => {
+    if (Platform.OS === 'android') setShowDatePicker(false);
+
+    if (selectedDate) {
+      setDateObject(selectedDate);
+      setBday(selectedDate.toISOString().split('T')[0]);
+      const age = calculateAge(selectedDate);
+      setDisplayAge(`${age} years old`);
+    }
+  };
+
+  const saveChanges = async () => {
+    if (!patient) return;
     setLoading(true);
+
+    // 1. Re-combine names for MySQL Database (needs 1 string)
+    const fullNameCombined = `${givenName} ${middleName} ${lastName}`.replace(/\s+/g, " ").trim();
+    const calculatedAge = calculateAge(dateObject);
+
     try {
-      // 1. Update our local database
+      // 2. Update MySQL Database
       const res = await fetch(`${API.patients}/${patient.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          full_name: name,
+          full_name: fullNameCombined,
+          gender: sex,
+          birthdate: bday,
           contact_number: phone,
           address: address,
+          vitals: { ...patient.vitals, age: calculatedAge }
         }),
       });
 
-      if (!res.ok) {
-        throw new Error("Failed to update profile in local database.");
-      }
+      if (!res.ok) throw new Error("Failed to update profile database.");
 
-      // 2. Also update Clerk's user record to keep it in sync
+      // 3. Update Clerk User (FIX: Send firstName/lastName separately)
       await user.update({
-        fullName: name,
+        firstName: givenName,
+        lastName: `${middleName ? middleName + " " : ""}${lastName}`.trim()
       });
 
       Alert.alert("Success", "Your profile has been updated.");
       router.back();
     } catch (error) {
-      console.error("Error saving profile:", error);
-      Alert.alert("Error", "Failed to save changes.");
+      console.error(error);
+      Alert.alert("Error", "Failed to save changes: " + error.message);
     } finally {
       setLoading(false);
     }
   };
-  
+
   if (loading && !patient) {
-      return (
-          <View style={[styles.container, {justifyContent: 'center'}]}>
-              <ActivityIndicator size="large" color="#1B93D5" />
-          </View>
-      )
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#1B93D5" />
+      </View>
+    );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Edit Profile</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#1E293B" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Edit Profile</Text>
+        <View style={{ width: 24 }} />
+      </View>
 
-      <Text style={styles.label}>Full Name</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Your full name"
-        value={name}
-        onChangeText={setName}
-      />
+      {/* Avatar */}
+      <View style={styles.avatarContainer}>
+        <View style={styles.avatarCircle}>
+          <Ionicons name="person" size={50} color="white" />
+        </View>
+      </View>
 
-      <Text style={styles.label}>Phone Number</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Your phone number"
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-      />
+      {/* Form Fields */}
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Given name</Text>
+        <TextInput
+          style={styles.input}
+          value={givenName}
+          onChangeText={setGivenName}
+          placeholder="First Name"
+        />
 
-      <Text style={styles.label}>Address</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Your address"
-        value={address}
-        onChangeText={setAddress}
-      />
+        <Text style={styles.label}>Middle name(optional)</Text>
+        <TextInput
+          style={styles.input}
+          value={middleName}
+          onChangeText={setMiddleName}
+          placeholder="Middle Name"
+        />
 
-      <TouchableOpacity 
-        style={[styles.saveButton, loading && styles.disabledButton]} 
-        onPress={saveChanges}
-        disabled={loading}
-      >
-        {loading ? (
-            <ActivityIndicator color="#fff" />
-        ) : (
-            <Text style={styles.saveText}>Save Changes</Text>
+        <Text style={styles.label}>Last name</Text>
+        <TextInput
+          style={styles.input}
+          value={lastName}
+          onChangeText={setLastName}
+          placeholder="Last Name"
+        />
+
+        {/* Sex Dropdown */}
+        <Text style={styles.label}>Sex</Text>
+        <TouchableOpacity style={styles.input} onPress={() => setModalVisible(true)}>
+          <Text style={{ color: sex ? '#1E293B' : '#aaa' }}>
+            {sex || "Select Sex"}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color="#666" style={{ position: 'absolute', right: 15, top: 14 }} />
+        </TouchableOpacity>
+
+        {/* Bday DatePicker */}
+        <Text style={styles.label}>Birthday</Text>
+        <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
+          {bday ? (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
+              <Text style={{ color: '#1E293B' }}>{bday}</Text>
+              <Text style={{ color: '#1B93D5', fontWeight: '600' }}>{displayAge}</Text>
+            </View>
+          ) : (
+            <Text style={{ color: '#aaa' }}>Select Birthdate</Text>
+          )}
+          <Ionicons name="calendar-outline" size={20} color="#666" style={{ position: 'absolute', right: 15, top: 14 }} />
+        </TouchableOpacity>
+
+        {/* Native Date Picker Component */}
+        {showDatePicker && (
+          <DateTimePicker
+            testID="dateTimePicker"
+            value={dateObject}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={onChangeDate}
+            maximumDate={new Date()}
+          />
         )}
+
+        {Platform.OS === 'ios' && showDatePicker && (
+          <TouchableOpacity onPress={() => setShowDatePicker(false)} style={styles.iosDoneBtn}>
+            <Text style={{ color: 'white' }}>Done</Text>
+          </TouchableOpacity>
+        )}
+
+        <Text style={styles.label}>Phone number</Text>
+        <TextInput
+          style={styles.input}
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+          placeholder="0917..."
+        />
+
+        <Text style={styles.label}>Address</Text>
+        <TextInput
+          style={styles.input}
+          value={address}
+          onChangeText={setAddress}
+          placeholder="Full Address"
+        />
+      </View>
+
+      {/* Save Button */}
+      <TouchableOpacity style={styles.saveButton} onPress={saveChanges} disabled={loading}>
+        {loading ? <ActivityIndicator color="white" /> : <Text style={styles.saveButtonText}>save changes</Text>}
       </TouchableOpacity>
-    </View>
+
+      {/* Sex Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Sex</Text>
+            {['Male', 'Female'].map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                style={styles.modalOption}
+                onPress={() => { setSex(opt); setModalVisible(false); }}
+              >
+                <Text style={styles.optionText}>{opt}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#F4F8FF" },
-  title: { fontSize: 26, fontWeight: "700", marginBottom: 20 },
-  label: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: '#444',
-      marginBottom: 6,
-      marginLeft: 4
+  container: {
+    flex: 1,
+    backgroundColor: "#F4F8FF",
   },
+  scrollContent: {
+    padding: 24,
+    paddingTop: 60,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F4F8FF",
+  },
+
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
+  headerTitle: { fontSize: 20, fontWeight: "700", color: "#1E293B" },
+
+  avatarContainer: { alignItems: "center", marginBottom: 30 },
+  avatarCircle: {
+    width: 90, height: 90, borderRadius: 45, backgroundColor: "#1B93D5",
+    justifyContent: "center", alignItems: "center",
+    shadowColor: "#1B93D5", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6
+  },
+
+  formGroup: { marginBottom: 20 },
+  label: { fontSize: 14, fontWeight: "700", color: "#1E293B", marginBottom: 8, marginLeft: 4 },
+
   input: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    fontSize: 15
+    backgroundColor: "#FFFFFF", borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16, marginBottom: 16,
+    fontSize: 15, color: "#1E293B", height: 50, justifyContent: 'center',
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
   },
+
   saveButton: {
-    backgroundColor: "#1B93D5",
-    padding: 14,
-    borderRadius: 12,
-    marginTop: 10,
+    backgroundColor: "#1B93D5", borderRadius: 12, paddingVertical: 16, alignItems: "center",
+    marginTop: 10, marginBottom: 40,
+    shadowColor: "#1B93D5", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4,
   },
-  disabledButton: {
-      backgroundColor: '#a0a0a0'
-  },
-  saveText: { textAlign: "center", color: "white", fontWeight: "700", fontSize: 16 },
+  saveButtonText: { color: "white", fontSize: 16, fontWeight: "700" },
+
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
+  modalContent: { width: "80%", backgroundColor: "white", borderRadius: 16, padding: 20, elevation: 5 },
+  modalTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 16, textAlign: "center" },
+  modalOption: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" },
+  optionText: { fontSize: 16, textAlign: "center", color: "#1B93D5" },
+
+  iosDoneBtn: { alignSelf: 'flex-end', backgroundColor: '#1B93D5', padding: 8, borderRadius: 8, marginBottom: 10 }
 });

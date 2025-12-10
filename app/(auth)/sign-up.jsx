@@ -12,8 +12,7 @@ import {
 } from "react-native";
 import { useSignUp } from "@clerk/clerk-expo";
 import { Link, useRouter } from "expo-router";
-// Ensure relative path is correct: ../../ points to root from app/(auth)/
-import { API } from "../../constants/Api"; 
+import { API } from "../../constants/Api";
 
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -63,7 +62,7 @@ export default function SignUpScreen() {
       });
 
       if (signUpAttempt.status === "complete") {
-        
+
         // --- BACKEND CONNECTION START ---
         // Create the patient in your MySQL database now that they are verified
         try {
@@ -73,18 +72,20 @@ export default function SignUpScreen() {
             body: JSON.stringify({
               full_name: fullName,
               email: emailAddress.trim(),
-              address: "Update your profile", // Default values
+              address: "Update your profile", // Default value
               contact_number: "",
               gender: "Unspecified"
             })
           });
-          
+
           if (!res.ok) {
             console.error("Failed to create patient in DB");
+            // We alert but still allow login because Clerk Auth succeeded
+            Alert.alert("Notice", "Account created, but profile setup failed. Please contact support.");
           }
         } catch (dbError) {
           console.error("Database Error:", dbError);
-          // We don't block login if DB fails, but we log it
+          Alert.alert("Connection Error", "Could not connect to clinic server.");
         }
         // --- BACKEND CONNECTION END ---
 
@@ -138,7 +139,6 @@ export default function SignUpScreen() {
           <Text style={styles.appName}>iDENTify</Text>
           <Text style={styles.title}>Create Account</Text>
 
-          {/* Added Full Name Field */}
           <TextInput
             value={fullName}
             placeholder="Full Name"
@@ -191,7 +191,6 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     paddingBottom: 40,
   },
-
   appName: {
     fontSize: 52,
     fontWeight: "900",
@@ -199,7 +198,6 @@ const styles = StyleSheet.create({
     color: "#1A7FCC",
     marginBottom: 5,
   },
-
   title: {
     fontSize: 26,
     fontWeight: "700",
@@ -207,7 +205,6 @@ const styles = StyleSheet.create({
     color: "#2A2A2A",
     marginBottom: 35,
   },
-
   verifyTitle: {
     fontSize: 28,
     fontWeight: "700",
@@ -215,13 +212,11 @@ const styles = StyleSheet.create({
     color: "#1A7FCC",
     marginBottom: 10,
   },
-  
   subtitle: {
-    textAlign: "center", 
-    color: "#666", 
+    textAlign: "center",
+    color: "#666",
     marginBottom: 20
   },
-
   input: {
     width: "100%",
     backgroundColor: "#FFFFFF",
@@ -238,7 +233,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 3,
   },
-
   button: {
     backgroundColor: "#1A7FCC",
     paddingVertical: 15,
@@ -250,24 +244,20 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowRadius: 6,
   },
-
   buttonText: {
     color: "white",
     fontSize: 18,
     fontWeight: "700",
     textAlign: "center",
   },
-
   footerRow: {
     flexDirection: "row",
     justifyContent: "center",
     marginTop: 22,
   },
-
   footerText: {
     color: "#555",
   },
-
   link: {
     marginLeft: 5,
     color: "#1A7FCC",

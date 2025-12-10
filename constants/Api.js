@@ -1,11 +1,14 @@
-const API_BASE_URL = "http://192.168.137.89:4006"; // CHANGE THIS based on your setup
+// ⚠️ IMPORTANT: Replace '192.168.137.89' with your computer's actual local IP address.
+// Run 'ipconfig' (Windows) or 'ipconfig getifaddr en0' (Mac) to find it.
+const API_BASE_URL = "http://192.168.137.71:4006"; 
 
 export const API = {
   patients: `${API_BASE_URL}/api/patients`,
   appointments: `${API_BASE_URL}/api/appointments`,
   queue: `${API_BASE_URL}/api/queue`,
-  records: `${API_BASE_URL}/api/treatment-timeline`, // Using timeline for records
+  records: `${API_BASE_URL}/api/treatment-timeline`, 
   dentists: `${API_BASE_URL}/api/dentists`,
+  medications: `${API_BASE_URL}/api/medications`,
 };
 
 export const fetchPatientByEmail = async (email) => {
