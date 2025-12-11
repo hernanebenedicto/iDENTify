@@ -17,6 +17,19 @@ import { useFocusEffect } from "expo-router";
 import { API, fetchPatientByEmail } from "../../constants/Api";
 import { dentalServices } from "../../constants/services";
 
+// import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// const clearAll = async () => {
+//   try {
+//     await AsyncStorage.clear();
+//     console.log("Storage cleared!");
+//   } catch (e) {
+//     console.log("Error clearing storage:", e);
+//   }
+// };
+
+// clearAll()
+
 // HELPER: Fix Date format for Mobile (Space -> T)
 const parseDate = (dateString) => {
   if (!dateString) return new Date();

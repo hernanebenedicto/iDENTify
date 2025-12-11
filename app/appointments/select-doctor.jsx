@@ -16,9 +16,7 @@ export default function SelectDoctor() {
         const res = await fetch(API.dentists);
         const data = await res.json();
 
-        // FIX: Filter out dentists who are "Off"
-        // We only show 'Available' or 'Busy' (Busy might still accept bookings depending on your rule, 
-        // but 'Off' definitely shouldn't be here).
+        // FILTER: Strictly remove dentists who are "Off"
         const activeDoctors = data.filter(doc => doc.status !== 'Off');
 
         setDoctors(activeDoctors);
@@ -68,7 +66,7 @@ export default function SelectDoctor() {
                 <Text style={styles.cardSubtitle}>{doc.specialization || "General Dentist"}</Text>
               </View>
 
-              {/* Show Busy Tag if status is Busy */}
+              {/* Show Busy Tag if status is Busy (But still clickable) */}
               {doc.status === 'Busy' && (
                 <View style={styles.busyBadge}>
                   <Text style={styles.busyText}>Busy</Text>
