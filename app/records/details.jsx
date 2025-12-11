@@ -2,18 +2,19 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, Stack } from "expo-router";
 import { useEffect, useState } from "react";
-import { API, fetchPatientByEmail } from "../../constants/Api"; // Ensure this import is correct
+import { API, fetchPatientByEmail } from "../../constants/Api";
 import { useUser } from "@clerk/clerk-expo";
-import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import * as FileSystem from 'expo-file-system/legacy';
 
 export default function RecordDetails() {
   const { id } = useLocalSearchParams();
   const { user } = useUser();
 
   const [record, setRecord] = useState(null);
-  const [medications, setMedications] = useState([]); // Consolidated Medications
+  const [medications, setMedications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
 
@@ -23,14 +24,12 @@ export default function RecordDetails() {
       setLoading(true);
 
       try {
-        // 1. Fetch Specific Record Details
         const recordRes = await fetch(`${API.records}/record/${id}`);
         if (recordRes.ok) {
           const recordData = await recordRes.json();
           setRecord(recordData);
         }
 
-        // 2. Fetch All Medications for context (Consolidated View)
         const patient = await fetchPatientByEmail(user.primaryEmailAddress.emailAddress);
         if (patient) {
           const medsRes = await fetch(`${API.medications}/${patient.id}`);
@@ -56,24 +55,52 @@ export default function RecordDetails() {
 
     try {
       setDownloading(true);
-      const fileName = "Medical_Record_" + id + ".jpg";
-      const fileUri = FileSystem.cacheDirectory + fileName;
 
-      // Handle Base64 vs URL
+      // 1. Detect correct extension and mime type
+      let extension = "jpg";
+      let mimeType = "image/jpeg";
+
+      if (record.image_url.startsWith('data:')) {
+        const header = record.image_url.split(';base64,')[0];
+        const type = header.split(':')[1];
+        if (type) {
+          mimeType = type;
+          extension = type.split('/')[1];
+        }
+      }
+
+      // 2. Construct File Path (Using Legacy Directory)
+      // Fallback to documentDirectory if cacheDirectory is missing (rare edge case)
+      const baseDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
+
+      if (!baseDir) {
+        throw new Error("Storage directory not available on this device.");
+      }
+
+      const fileName = `Medical_Record_${id}.${extension}`;
+      const fileUri = baseDir + fileName;
+
+      // 3. Write file
       if (record.image_url.startsWith('data:')) {
         const base64Code = record.image_url.split('base64,')[1];
-        await FileSystem.writeAsStringAsync(fileUri, base64Code, { encoding: FileSystem.EncodingType.Base64 });
+        await FileSystem.writeAsStringAsync(fileUri, base64Code, { encoding: 'base64' });
       } else {
         await FileSystem.downloadAsync(record.image_url, fileUri);
       }
 
+      // 4. Share/Save
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri);
+        await Sharing.shareAsync(fileUri, {
+          mimeType: mimeType,
+          dialogTitle: "Save X-ray Image",
+          UTI: mimeType
+        });
       } else {
-        Alert.alert("Saved", "File saved to cache.");
+        Alert.alert("Saved", `File saved to: ${fileUri}`);
       }
     } catch (err) {
-      Alert.alert("Error", "Download failed.");
+      console.error("Download Error Details:", err);
+      Alert.alert("Error", `Download failed: ${err.message}`);
     } finally {
       setDownloading(false);
     }
@@ -97,7 +124,6 @@ export default function RecordDetails() {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
 
-        {/* --- SECTION 1: TREATMENT DETAILS --- */}
         <View style={styles.headerSection}>
           <View style={styles.providerAvatar}>
             <Text style={styles.avatarText}>{record.provider ? record.provider.charAt(0) : "D"}</Text>
@@ -130,7 +156,6 @@ export default function RecordDetails() {
           <Text style={styles.notesText}>{record.notes || "No clinical notes recorded."}</Text>
         </View>
 
-        {/* --- SECTION 2: ATTACHMENTS --- */}
         <Text style={styles.sectionHeader}>Attached Files (X-ray)</Text>
         {hasFile ? (
           <View>
@@ -146,9 +171,9 @@ export default function RecordDetails() {
               </View>
               <View style={styles.attachmentInfo}>
                 <Text style={styles.attachmentName}>View / Save Image</Text>
-                <Text style={styles.attachmentSize}>Tap to download</Text>
+                <Text style={styles.attachmentSize}>Tap to open options</Text>
               </View>
-              {downloading ? <ActivityIndicator size="small" color="#1B93D5" /> : <Ionicons name="download-outline" size={24} color="#1B93D5" />}
+              {downloading ? <ActivityIndicator size="small" color="#1B93D5" /> : <Ionicons name="share-outline" size={24} color="#1B93D5" />}
             </TouchableOpacity>
           </View>
         ) : (
@@ -157,7 +182,6 @@ export default function RecordDetails() {
           </View>
         )}
 
-        {/* --- SECTION 3: ACTIVE MEDICATIONS (Consolidated) --- */}
         <View style={styles.dividerLarge} />
         <Text style={styles.sectionHeader}>Active Prescriptions</Text>
 
