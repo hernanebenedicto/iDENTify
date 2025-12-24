@@ -1,6 +1,4 @@
-// ⚠️ IMPORTANT: Replace '192.168.137.89' with your computer's actual local IP address.
-// Run 'ipconfig' (Windows) or 'ipconfig getifaddr en0' (Mac) to find it.
-const API_BASE_URL = "http://192.168.137.71:4006"; 
+const API_BASE_URL = "http://localhost:4006"; 
 
 export const API = {
   patients: `${API_BASE_URL}/api/patients`,
