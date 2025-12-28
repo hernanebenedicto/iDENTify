@@ -56,6 +56,13 @@ export default function BookAppointment() {
                 <Text style={[styles.cardText, isSelected && styles.cardTextSelected]}>
                   {service.title}
                 </Text>
+
+                {/* ADDED: Price Display */}
+                {service.price && (
+                  <Text style={[styles.priceText, isSelected && styles.priceTextSelected]}>
+                    {service.price}
+                  </Text>
+                )}
               </TouchableOpacity>
             );
           })}
@@ -115,8 +122,11 @@ const styles = StyleSheet.create({
   iconCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: "#F0F9FF", justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
   iconCircleSelected: { backgroundColor: "white" },
 
-  cardText: { fontSize: 14, fontWeight: "600", color: "#334155", textAlign: 'center' },
+  cardText: { fontSize: 14, fontWeight: "600", color: "#334155", textAlign: 'center', marginBottom: 4 },
   cardTextSelected: { color: "#1B93D5", fontWeight: "700" },
+
+  priceText: { fontSize: 12, fontWeight: "500", color: "#64748B", textAlign: 'center' },
+  priceTextSelected: { color: "#1B93D5" },
 
   checkIcon: { position: 'absolute', top: 10, right: 10 },
 
