@@ -98,13 +98,18 @@ export default function AddFamilyMember() {
 
 	return (
 		<ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+
+			{/* Header with Back + Text */}
 			<View style={styles.header}>
 				<TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
 					<Ionicons name="arrow-back" size={24} color="#1E293B" />
+					<Text style={styles.backText}>Back</Text>
 				</TouchableOpacity>
+
 				<Text style={styles.headerTitle}>Add Family Member</Text>
-				<View style={{ width: 24 }} />
+				<View style={{ width: 60 }} />
 			</View>
+
 			<View style={styles.formGroup}>
 				<Text style={styles.label}>Set nickname/relationship</Text>
 				<TextInput style={styles.input} value={relationship} onChangeText={setRelationship} placeholder="e.g. Son, Wife" />
@@ -159,6 +164,21 @@ const styles = StyleSheet.create({
 	container: { flex: 1, backgroundColor: "#F4F8FF" },
 	scrollContent: { padding: 24, paddingTop: 60 },
 	header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
+
+	// Back Button Styles
+	backButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		padding: 8,
+		marginLeft: -8
+	},
+	backText: {
+		fontSize: 16,
+		color: "#1E293B",
+		marginLeft: 6,
+		fontWeight: "600"
+	},
+
 	headerTitle: { fontSize: 20, fontWeight: "700", color: "#1E293B" },
 	formGroup: { marginBottom: 20 },
 	label: { fontSize: 14, fontWeight: "700", color: "#1E293B", marginBottom: 8, marginLeft: 4 },

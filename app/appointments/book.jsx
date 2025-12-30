@@ -26,7 +26,14 @@ export default function BookAppointment() {
   return (
     <View style={styles.mainContainer}>
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+
+        {/* HEADER WITH BACK BUTTON */}
         <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#1E293B" />
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
+
           <Text style={styles.title}>Book Appointment</Text>
           <Text style={styles.subtitle}>Select one or more services</Text>
         </View>
@@ -57,7 +64,7 @@ export default function BookAppointment() {
                   {service.title}
                 </Text>
 
-                {/* ADDED: Price Display */}
+                {/* Price Display */}
                 {service.price && (
                   <Text style={[styles.priceText, isSelected && styles.priceTextSelected]}>
                     {service.price}
@@ -91,7 +98,25 @@ const styles = StyleSheet.create({
   mainContainer: { flex: 1, backgroundColor: "#F8FAFC" },
   container: { flex: 1 },
   contentContainer: { padding: 24, paddingTop: 40 },
+
   header: { marginBottom: 32 },
+
+  // Back Button Styles
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+    paddingRight: 10,
+    marginLeft: -4
+  },
+  backText: {
+    fontSize: 16,
+    color: "#1E293B",
+    marginLeft: 6,
+    fontWeight: "600"
+  },
+
   title: { fontSize: 28, fontWeight: "800", color: "#1E293B", marginBottom: 8, letterSpacing: -0.5 },
   subtitle: { fontSize: 16, color: "#64748B", fontWeight: "500" },
 
@@ -112,7 +137,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 3,
     borderWidth: 2,
-    borderColor: "transparent" // Default invisible border
+    borderColor: "transparent"
   },
   cardSelected: {
     borderColor: "#1B93D5",

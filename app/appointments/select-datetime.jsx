@@ -1,546 +1,3 @@
-// import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from "react-native";
-// import { useLocalSearchParams, useRouter } from "expo-router";
-// import { useState, useEffect, useMemo } from "react";
-// import { API, fetchPatientByEmail } from "../../constants/Api";
-// import { useUser } from "@clerk/clerk-expo";
-// import { Ionicons } from "@expo/vector-icons";
-
-// // --- CALENDAR HELPERS ---
-// const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-// export default function ConfirmAppointment() {
-//   const router = useRouter();
-//   const { user } = useUser();
-//   const { doctor, docId, service } = useLocalSearchParams();
-
-//   const [loading, setLoading] = useState(false);
-//   const [dentist, setDentist] = useState(null);
-//   const [appointments, setAppointments] = useState([]);
-//   const [fetchingData, setFetchingData] = useState(true);
-
-//   // Availability State
-//   const [dailyCount, setDailyCount] = useState(0);
-//   const [limit, setLimit] = useState(5);
-
-//   // Calendar State
-//   const [currentDate, setCurrentDate] = useState(new Date());
-
-//   // Initialize selectedDate with local YYYY-MM-DD
-//   const [selectedDate, setSelectedDate] = useState(() => {
-//     const now = new Date();
-//     const year = now.getFullYear();
-//     const month = String(now.getMonth() + 1).padStart(2, '0');
-//     const day = String(now.getDate()).padStart(2, '0');
-//     return `${year}-${month}-${day}`;
-//   });
-
-//   useEffect(() => {
-//     const fetchData = async () => {
-//       try {
-//         const resDentists = await fetch(`${API.dentists}`);
-//         const allDentists = await resDentists.json();
-//         const selected = allDentists.find(d => String(d.id) === String(docId));
-//         setDentist(selected);
-
-//         const resAppts = await fetch(`${API.appointments}`);
-//         const allAppts = await resAppts.json();
-
-//         // 1. FILTER: Get all appointments for this dentist that are NOT Cancelled.
-//         const dentistAppts = allAppts.filter(a =>
-//           String(a.dentist_id) === String(docId) && a.status !== 'Cancelled'
-//         );
-//         setAppointments(dentistAppts);
-
-//       } catch (err) {
-//         console.error("Error fetching data", err);
-//       } finally {
-//         setFetchingData(false);
-//       }
-//     };
-//     fetchData();
-//   }, [docId]);
-
-//   // Check Limit Effect when Selected Date Changes
-//   useEffect(() => {
-//     let isActive = true;
-//     async function checkLimit() {
-//       try {
-//         const res = await fetch(`${API.appointments}/check-limit?dentist_id=${docId}&date=${selectedDate}`);
-//         const data = await res.json();
-//         if (isActive) {
-//           setDailyCount(data.count || 0);
-//           if (data.limit) setLimit(data.limit);
-//         }
-//       } catch (e) {
-//         console.error("Failed limit check", e);
-//       }
-//     }
-//     checkLimit();
-//     return () => { isActive = false; };
-//   }, [selectedDate, docId]);
-
-//   const isLimitReached = dailyCount >= limit;
-
-//   // --- CALENDAR LOGIC ---
-//   const changeMonth = (direction) => {
-//     const newDate = new Date(currentDate);
-//     newDate.setMonth(newDate.getMonth() + direction);
-//     setCurrentDate(newDate);
-//   };
-
-//   const getDayStatus = (dateStr, dayIndex) => {
-//     if (!dentist) return "Closed";
-//     if (dentist.status === 'Off') return "Off";
-//     if (dentist.leaveDays?.includes(dateStr)) return "Leave";
-//     const works = dentist.days?.some(day => Number(day) === dayIndex);
-//     return works ? "Open" : "Closed";
-//   };
-
-//   const renderCalendar = () => {
-//     const year = currentDate.getFullYear();
-//     const month = currentDate.getMonth();
-
-//     const firstDay = new Date(year, month, 1).getDay();
-//     const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-//     const days = [];
-
-//     for (let i = 0; i < firstDay; i++) {
-//       days.push(<View key={`empty-${i}`} style={styles.calendarDay} />);
-//     }
-
-//     for (let i = 1; i <= daysInMonth; i++) {
-//       const dateObj = new Date(year, month, i);
-//       const y = dateObj.getFullYear();
-//       const m = String(dateObj.getMonth() + 1).padStart(2, '0');
-//       const d = String(dateObj.getDate()).padStart(2, '0');
-//       const dateStr = `${y}-${m}-${d}`;
-
-//       const dayIndex = dateObj.getDay();
-//       const status = getDayStatus(dateStr, dayIndex);
-//       const isSelected = selectedDate === dateStr;
-//       const isOpen = status === "Open";
-
-//       // Disable past dates
-//       const now = new Date();
-//       const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-//       const isPast = dateStr < todayStr;
-//       const isDisabled = !isOpen || isPast;
-
-//       days.push(
-//         <TouchableOpacity
-//           key={dateStr}
-//           style={[
-//             styles.calendarDay,
-//             isSelected && styles.selectedDay,
-//             !isOpen && !isPast && styles.offDay,
-//             isOpen && !isSelected && styles.openDay,
-//             isPast && styles.pastDay
-//           ]}
-//           onPress={() => setSelectedDate(dateStr)}
-//           disabled={isDisabled}
-//         >
-//           <Text style={[
-//             styles.dayText,
-//             isSelected && styles.selectedDayText,
-//             !isOpen && styles.offDayText,
-//             isPast && styles.pastDayText
-//           ]}>
-//             {i}
-//           </Text>
-//           {isOpen && !isPast && !isSelected && <View style={styles.dot} />}
-//         </TouchableOpacity>
-//       );
-//     }
-
-//     return days;
-//   };
-
-//   // --- TIME SLOT LOGIC ---
-//   const availableSlots = useMemo(() => {
-//     if (!dentist) return [];
-
-//     const toMin = (t) => {
-//       if (!t) return 0;
-//       const [h, m] = t.split(':').map(Number);
-//       return h * 60 + m;
-//     };
-
-//     const slots = [];
-//     const operatingStart = dentist.operatingHours?.start || "09:00";
-//     const operatingEnd = dentist.operatingHours?.end || "17:00";
-
-//     const startMin = toMin(operatingStart);
-//     const endMin = toMin(operatingEnd);
-
-//     // Is the selected date a working day?
-//     const selDateObj = new Date(selectedDate);
-//     const dayIndex = selDateObj.getDay();
-//     const status = getDayStatus(selectedDate, dayIndex);
-
-//     if (status !== "Open") return [];
-
-//     // --- PAST TIME CHECK ---
-//     const now = new Date();
-//     const tYear = now.getFullYear();
-//     const tMonth = String(now.getMonth() + 1).padStart(2, '0');
-//     const tDay = String(now.getDate()).padStart(2, '0');
-//     const todayStr = `${tYear}-${tMonth}-${tDay}`;
-
-//     const isToday = selectedDate === todayStr;
-//     const currentMinutes = now.getHours() * 60 + now.getMinutes();
-//     // -----------------------
-
-//     // 2. Filter appointments for the SELECTED DATE
-//     const todayAppts = appointments.filter(a => {
-//       if (!a.appointment_datetime) return false;
-//       const aDate = a.appointment_datetime.includes("T")
-//         ? a.appointment_datetime.split("T")[0]
-//         : a.appointment_datetime.split(" ")[0];
-//       return aDate === selectedDate;
-//     }).map(a => {
-//       let timePart = "";
-//       if (a.appointment_datetime.includes("T")) {
-//         timePart = a.appointment_datetime.split("T")[1];
-//       } else {
-//         timePart = a.appointment_datetime.split(" ")[1];
-//       }
-
-//       if (!timePart) return { start: -1, end: -1 };
-
-//       const [h, m] = timePart.split(':').map(Number);
-//       const startMins = h * 60 + m;
-//       return { start: startMins, end: startMins + 30 };
-//     });
-
-//     // Generate slots
-//     for (let time = startMin; time < endMin; time += 30) {
-//       const h = Math.floor(time / 60);
-//       const m = time % 60;
-//       const slotEnd = time + 30;
-
-//       // 1. Setup default state
-//       let type = 'open'; // Types: 'open', 'lunch', 'break', 'past', 'booked'
-//       const timeStr24 = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-//       const h12 = h % 12 || 12;
-//       const ampm = h >= 12 ? 'PM' : 'AM';
-//       let label = `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
-
-//       // 2. Check Lunch
-//       if (dentist.lunch) {
-//         const lStart = toMin(dentist.lunch.start);
-//         const lEnd = toMin(dentist.lunch.end);
-//         if (time < lEnd && slotEnd > lStart) {
-//           type = 'lunch';
-//           label = "Lunch";
-//         }
-//       }
-
-//       // 3. Check Breaks (Priority over Open, but Lunch takes precedence over break if overlaps)
-//       if (type === 'open' && dentist.breaks && Array.isArray(dentist.breaks)) {
-//         for (let b of dentist.breaks) {
-//           const bStart = toMin(b.start);
-//           const bEnd = toMin(b.end);
-//           if (time < bEnd && slotEnd > bStart) {
-//             type = 'break';
-//             label = "Break";
-//             break;
-//           }
-//         }
-//       }
-
-//       // 4. Check Past (Only if currently open)
-//       if (type === 'open' && isToday && time <= currentMinutes) {
-//         type = 'past';
-//       }
-
-//       // 5. Check Booked (Only if currently open)
-//       if (type === 'open') {
-//         for (let appt of todayAppts) {
-//           // Standard overlap check
-//           if (time < appt.end && slotEnd > appt.start) {
-//             type = 'booked';
-//             break;
-//           }
-//         }
-//       }
-
-//       slots.push({
-//         value: timeStr24,
-//         label: label,
-//         type: type,
-//       });
-//     }
-
-//     return slots;
-//   }, [dentist, selectedDate, appointments]);
-
-//   const bookAppointment = async (timeSlot) => {
-//     if (!user?.primaryEmailAddress?.emailAddress) return;
-
-//     setLoading(true);
-//     try {
-//       let patient = await fetchPatientByEmail(user.primaryEmailAddress.emailAddress);
-
-//       if (!patient) {
-//         const createRes = await fetch(API.patients, {
-//           method: 'POST',
-//           headers: { 'Content-Type': 'application/json' },
-//           body: JSON.stringify({
-//             full_name: user.fullName,
-//             email: user.primaryEmailAddress.emailAddress,
-//             address: "N/A",
-//             contact_number: "",
-//             gender: "Unspecified"
-//           })
-//         });
-
-//         if (!createRes.ok) {
-//           Alert.alert("Error", "Could not create patient profile.");
-//           setLoading(false);
-//           return;
-//         }
-//         patient = await createRes.json();
-//       }
-
-//       const fullDateTimeStart = `${selectedDate} ${timeSlot.value}:00`;
-
-//       const payload = {
-//         patient_id: patient.id,
-//         dentist_id: docId,
-//         timeStart: fullDateTimeStart,
-//         procedure: service,
-//         status: "Scheduled",
-//         notes: "Booked via App"
-//       };
-
-//       const res = await fetch(API.appointments, {
-//         method: 'POST',
-//         headers: { 'Content-Type': 'application/json' },
-//         body: JSON.stringify(payload)
-//       });
-
-//       if (res.ok) {
-//         Alert.alert("Success", "Appointment Booked!", [
-//           { text: "OK", onPress: () => router.replace("/(tabs)/appointments") }
-//         ]);
-//       } else {
-//         const data = await res.json();
-//         Alert.alert("Failed", data.message || "Could not book appointment.");
-//       }
-//     } catch (error) {
-//       console.error(error);
-//       Alert.alert("Error", "Network error.");
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   if (fetchingData) {
-//     return <View style={styles.loadingCenter}><ActivityIndicator size="large" color="#1B93D5" /></View>;
-//   }
-
-//   return (
-//     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-
-//       <View style={styles.header}>
-//         <Text style={styles.title}>Confirm Booking</Text>
-//         <Text style={styles.subtitle}>with {doctor}</Text>
-//         {dentist?.status === 'Off' && (
-//           <Text style={{ color: '#EF4444', fontWeight: 'bold', marginTop: 8 }}>
-//             Note: This dentist is currently marked as Off.
-//           </Text>
-//         )}
-//       </View>
-
-//       <View style={styles.summaryCard}>
-//         <View style={styles.summaryItem}>
-//           <View style={styles.iconBox}>
-//             <Ionicons name="clipboard" size={20} color="#1B93D5" />
-//           </View>
-//           <View>
-//             <Text style={styles.summaryLabel}>Service</Text>
-//             <Text style={styles.summaryValue}>{service || "Checkup"}</Text>
-//           </View>
-//         </View>
-//       </View>
-
-//       {/* --- CALENDAR SECTION --- */}
-//       <View style={styles.calendarContainer}>
-//         <View style={styles.calendarHeader}>
-//           <TouchableOpacity onPress={() => changeMonth(-1)}>
-//             <Ionicons name="chevron-back" size={24} color="#1E293B" />
-//           </TouchableOpacity>
-//           <Text style={styles.monthTitle}>
-//             {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-//           </Text>
-//           <TouchableOpacity onPress={() => changeMonth(1)}>
-//             <Ionicons name="chevron-forward" size={24} color="#1E293B" />
-//           </TouchableOpacity>
-//         </View>
-
-//         <View style={styles.dayLabels}>
-//           {DAYS_OF_WEEK.map(day => (
-//             <Text key={day} style={styles.dayLabelText}>{day}</Text>
-//           ))}
-//         </View>
-
-//         <View style={styles.daysGrid}>
-//           {renderCalendar()}
-//         </View>
-
-//         <View style={styles.legendContainer}>
-//           <View style={styles.legendItem}><View style={[styles.dotLegend, { backgroundColor: '#22C55E' }]} /><Text style={styles.legendText}>Available</Text></View>
-//           <View style={styles.legendItem}><View style={[styles.dotLegend, { backgroundColor: '#FCA5A5' }]} /><Text style={styles.legendText}>Off/Full</Text></View>
-//         </View>
-//       </View>
-
-//       {/* DAILY LOAD INDICATOR */}
-//       <View style={[
-//         styles.loadContainer,
-//         isLimitReached ? styles.loadFull : styles.loadAvailable
-//       ]}>
-//         <Ionicons
-//           name={isLimitReached ? "alert-circle" : "information-circle"}
-//           size={20}
-//           color={isLimitReached ? "#B91C1C" : "#166534"}
-//         />
-//         <Text style={[
-//           styles.loadText,
-//           { color: isLimitReached ? "#B91C1C" : "#166534" }
-//         ]}>
-//           Daily Load: {dailyCount} / {limit} Patients
-//         </Text>
-//       </View>
-
-//       <Text style={styles.sectionTitle}>Available Times ({selectedDate})</Text>
-
-//       {/* WARNING IF FULL */}
-//       {isLimitReached && (
-//         <View style={styles.warningBox}>
-//           <Text style={styles.warningText}>
-//             Limit Reached. No online slots available for this date.
-//           </Text>
-//         </View>
-//       )}
-
-//       {availableSlots.length === 0 ? (
-//         <View style={styles.noSlotsBox}>
-//           <Text style={styles.noSlotsText}>
-//             {dentist?.status === 'Off'
-//               ? "Dentist is currently marked as Off."
-//               : isLimitReached
-//                 ? "Fully booked for this date."
-//                 : "No available slots for this date (Non-working day or Past)."}
-//           </Text>
-//         </View>
-//       ) : (
-//         <View style={styles.timeGrid}>
-//           {loading ? (
-//             <ActivityIndicator size="large" color="#1B93D5" style={{ marginVertical: 20 }} />
-//           ) : (
-//             availableSlots.map((slot, i) => {
-//               // DISABLED IF: Anything other than 'open' OR Limit Reached
-//               const isDisabled = slot.type !== 'open' || isLimitReached;
-
-//               // Special styling for Lunch/Break text
-//               const isLabel = slot.type === 'lunch' || slot.type === 'break';
-
-//               return (
-//                 <TouchableOpacity
-//                   key={i}
-//                   style={[
-//                     styles.timeButton,
-//                     isDisabled && styles.bookedTimeButton // Gray out disabled slots
-//                   ]}
-//                   onPress={() => bookAppointment(slot)}
-//                   activeOpacity={0.7}
-//                   disabled={isDisabled}
-//                 >
-//                   <Text style={[
-//                     styles.timeText,
-//                     isDisabled && styles.bookedTimeText, // Gray text for disabled
-//                     isLabel && styles.labelTimeText // Special style for Lunch/Break
-//                   ]}>
-//                     {slot.label}
-//                   </Text>
-//                 </TouchableOpacity>
-//               );
-//             })
-//           )}
-//         </View>
-//       )}
-
-//     </ScrollView>
-//   );
-// }
-
-// const styles = StyleSheet.create({
-//   container: { flex: 1, backgroundColor: "#F8FAFC" },
-//   contentContainer: { padding: 24, paddingTop: 40 },
-//   loadingCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-//   header: { marginBottom: 24 },
-//   title: { fontSize: 28, fontWeight: "800", color: "#1E293B", marginBottom: 4, letterSpacing: -0.5 },
-//   subtitle: { fontSize: 16, color: "#64748B", fontWeight: "500" },
-
-//   summaryCard: { backgroundColor: "white", borderRadius: 20, padding: 20, shadowColor: "#64748B", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: "#F1F5F9", marginBottom: 32 },
-//   summaryItem: { flexDirection: "row", alignItems: "center" },
-//   iconBox: { width: 40, height: 40, borderRadius: 12, backgroundColor: "#F0F9FF", justifyContent: "center", alignItems: "center", marginRight: 16 },
-//   summaryLabel: { fontSize: 12, color: "#94A3B8", fontWeight: "600", textTransform: "uppercase", marginBottom: 2 },
-//   summaryValue: { fontSize: 16, fontWeight: "700", color: "#1E293B" },
-
-//   sectionTitle: { fontSize: 14, fontWeight: "700", color: "#94A3B8", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
-
-//   // --- CALENDAR STYLES ---
-//   calendarContainer: { backgroundColor: 'white', borderRadius: 16, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' },
-//   calendarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-//   monthTitle: { fontSize: 16, fontWeight: '700', color: '#1E293B' },
-//   dayLabels: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-//   dayLabelText: { width: '14.28%', textAlign: 'center', color: '#94A3B8', fontSize: 12, fontWeight: '600' },
-//   daysGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-//   calendarDay: { width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', marginVertical: 4, borderRadius: 20 },
-
-//   selectedDay: { backgroundColor: '#E0F2FE', borderWidth: 2, borderColor: '#1B93D5' },
-//   openDay: { backgroundColor: '#F0FDF4' },
-//   offDay: { backgroundColor: '#FEF2F2' },
-//   pastDay: { opacity: 0.3 },
-
-//   dayText: { fontSize: 14, color: '#334155', fontWeight: '500' },
-//   selectedDayText: { color: '#0284C7', fontWeight: '700' },
-//   offDayText: { color: '#EF4444' },
-//   pastDayText: { color: '#CBD5E1' },
-
-//   dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#22C55E', position: 'absolute', bottom: 6 },
-
-//   legendContainer: { flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12 },
-//   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-//   dotLegend: { width: 8, height: 8, borderRadius: 4 },
-//   legendText: { fontSize: 12, color: '#64748B' },
-
-//   // --- TIME SLOT STYLES ---
-//   timeGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 },
-//   timeButton: { width: '30%', backgroundColor: "white", borderRadius: 12, paddingVertical: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 8 },
-
-//   // Grayed out styles for booked/blocked slots
-//   bookedTimeButton: { backgroundColor: "#F1F5F9", borderColor: "#F1F5F9" },
-//   bookedTimeText: { color: "#94A3B8", textDecorationLine: 'line-through' },
-
-//   // Special style for labels (Lunch/Break) - No strikethrough, just bold/gray
-//   labelTimeText: { color: "#64748B", fontWeight: '700', textDecorationLine: 'none', fontSize: 12 },
-
-//   timeText: { fontSize: 14, fontWeight: "600", color: "#334155" },
-//   noSlotsBox: { padding: 20, alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 12 },
-//   noSlotsText: { color: '#64748B', fontStyle: 'italic', textAlign: 'center' },
-
-//   loadContainer: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, marginBottom: 24, borderWidth: 1 },
-//   loadAvailable: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
-//   loadFull: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
-//   loadText: { fontWeight: '700', marginLeft: 8, fontSize: 14 },
-//   warningBox: { marginBottom: 20, padding: 10, alignItems: 'center' },
-//   warningText: { color: '#991B1B', fontWeight: '500', textAlign: 'center' }
-// });
-
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView, Modal, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState, useEffect, useMemo } from "react";
@@ -563,7 +20,7 @@ export default function ConfirmAppointment() {
   // --- FAMILY / PATIENT SELECTION STATE ---
   const [mainProfile, setMainProfile] = useState(null);
   const [familyMembers, setFamilyMembers] = useState([]);
-  const [selectedPatient, setSelectedPatient] = useState(null); // The actual patient being booked for
+  const [selectedPatient, setSelectedPatient] = useState(null);
   const [showPatientModal, setShowPatientModal] = useState(false);
 
   // Availability State
@@ -602,10 +59,8 @@ export default function ConfirmAppointment() {
 
           if (parent) {
             setMainProfile(parent);
-            // Default selection is Main User
             setSelectedPatient(parent);
 
-            // Fetch Family Members
             const familyRes = await fetch(`${API.patients}/${parent.id}/family`);
             if (familyRes.ok) {
               const familyData = await familyRes.json();
@@ -623,7 +78,6 @@ export default function ConfirmAppointment() {
     fetchData();
   }, [docId, user]);
 
-  // Check Limit Effect
   useEffect(() => {
     let isActive = true;
     async function checkLimit() {
@@ -644,7 +98,6 @@ export default function ConfirmAppointment() {
 
   const isLimitReached = dailyCount >= limit;
 
-  // --- CALENDAR & SLOT LOGIC (Kept same as original) ---
   const changeMonth = (direction) => {
     const newDate = new Date(currentDate);
     newDate.setMonth(newDate.getMonth() + direction);
@@ -782,7 +235,6 @@ export default function ConfirmAppointment() {
       const fullDateTimeStart = `${selectedDate} ${timeSlot.value}:00`;
 
       const payload = {
-        // --- KEY CHANGE: Use selectedPatient.id instead of auto-fetched email ID ---
         patient_id: selectedPatient.id,
         dentist_id: docId,
         timeStart: fullDateTimeStart,
@@ -820,12 +272,17 @@ export default function ConfirmAppointment() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
 
+      {/* HEADER WITH BACK BUTTON */}
       <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#1E293B" />
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
+
         <Text style={styles.title}>Confirm Booking</Text>
         <Text style={styles.subtitle}>with {doctor}</Text>
       </View>
 
-      {/* --- NEW: PATIENT SELECTOR --- */}
       <TouchableOpacity
         style={styles.patientSelector}
         onPress={() => setShowPatientModal(true)}
@@ -855,7 +312,6 @@ export default function ConfirmAppointment() {
         </View>
       </View>
 
-      {/* CALENDAR & TIME SLOTS (Same as before) */}
       <View style={styles.calendarContainer}>
         <View style={styles.calendarHeader}>
           <TouchableOpacity onPress={() => changeMonth(-1)}>
@@ -876,7 +332,6 @@ export default function ConfirmAppointment() {
         </View>
       </View>
 
-      {/* DAILY LOAD INDICATOR */}
       <View style={[styles.loadContainer, isLimitReached ? styles.loadFull : styles.loadAvailable]}>
         <Ionicons name={isLimitReached ? "alert-circle" : "information-circle"} size={20} color={isLimitReached ? "#B91C1C" : "#166534"} />
         <Text style={[styles.loadText, { color: isLimitReached ? "#B91C1C" : "#166534" }]}>Daily Load: {dailyCount} / {limit} Patients</Text>
@@ -913,7 +368,6 @@ export default function ConfirmAppointment() {
         </View>
       )}
 
-      {/* --- PATIENT SELECTION MODAL --- */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -924,7 +378,6 @@ export default function ConfirmAppointment() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Who is this appointment for?</Text>
 
-            {/* MAIN PROFILE */}
             {mainProfile && (
               <TouchableOpacity
                 style={[styles.patientOption, selectedPatient?.id === mainProfile.id && styles.patientOptionSelected]}
@@ -938,7 +391,6 @@ export default function ConfirmAppointment() {
               </TouchableOpacity>
             )}
 
-            {/* FAMILY MEMBERS */}
             {familyMembers.map(member => (
               <TouchableOpacity
                 key={member.id}
@@ -969,10 +421,26 @@ const styles = StyleSheet.create({
   contentContainer: { padding: 24, paddingTop: 40 },
   loadingCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { marginBottom: 20 },
+
+  // Back Button Styles
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+    paddingRight: 10,
+    marginLeft: -4
+  },
+  backText: {
+    fontSize: 16,
+    color: "#1E293B",
+    marginLeft: 6,
+    fontWeight: "600"
+  },
+
   title: { fontSize: 28, fontWeight: "800", color: "#1E293B", marginBottom: 4, letterSpacing: -0.5 },
   subtitle: { fontSize: 16, color: "#64748B", fontWeight: "500" },
 
-  // Patient Selector Styles
   patientSelector: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1035,7 +503,6 @@ const styles = StyleSheet.create({
   loadFull: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
   loadText: { fontWeight: '700', marginLeft: 8, fontSize: 14 },
 
-  // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
   modalTitle: { fontSize: 18, fontWeight: '700', color: '#1E293B', marginBottom: 20, textAlign: 'center' },

@@ -108,6 +108,12 @@ export default function HomeScreen() {
 		setModalVisible(true);
 	};
 
+	// [FIX] Determine Display Name
+	// Priority: 1. Database Patient Name, 2. Clerk User First Name, 3. "Guest"
+	const displayName = patient?.full_name
+		? patient.full_name.split(' ')[0]
+		: (user?.firstName || "Guest");
+
 	return (
 		<View style={{ flex: 1 }}>
 			<ScrollView
@@ -121,9 +127,7 @@ export default function HomeScreen() {
 				<View style={styles.header}>
 					<View>
 						<Text style={styles.greeting}>Hello,</Text>
-						<Text style={styles.userName}>
-							{patient ? patient.full_name.split(' ')[0] : "Guest"}
-						</Text>
+						<Text style={styles.userName}>{displayName}</Text>
 					</View>
 					<TouchableOpacity
 						onPress={() => router.push("/profile")}

@@ -22,7 +22,7 @@ export default function QueueScreen() {
     if (!refreshing) setLoading(true);
     try {
       const me = await fetchPatientByEmail(user.primaryEmailAddress.emailAddress);
-      
+
       if (!me) {
         setQueueData({
           currentNumber: "—",
@@ -32,13 +32,17 @@ export default function QueueScreen() {
         });
         return;
       }
-      
+
       const res = await fetch(`${API.queue}/status?patient_id=${me.id}`);
       const data = await res.json();
 
       setQueueData({
-        currentNumber: data.nowServing ? data.nowServing.id : "—",
-        yourNumber: data.myStatus ? data.myStatus.id : "—",
+        // Use the calculated list position (servingNumber) instead of the DB ID
+        currentNumber: data.servingNumber ? String(data.servingNumber).padStart(2, '0') : "—",
+
+        // Use the calculated list position (myNumber) instead of the DB ID
+        yourNumber: data.myNumber ? String(data.myNumber).padStart(2, '0') : "—",
+
         status: data.myStatus ? data.myStatus.status : "Not In Queue",
         estimate: data.myStatus ? data.estimatedWaitTime : "—",
       });
@@ -65,6 +69,7 @@ export default function QueueScreen() {
   const getStatusColor = (status) => {
     switch (status) {
       case "Serving": return "#22C55E"; // Green
+      case "On Chair": return "#22C55E"; // Green (added to match web status)
       case "Near": return "#F59E0B"; // Orange
       case "Waiting": return "#3B82F6"; // Blue
       case "Done": return "#10B981"; // Emerald
@@ -73,8 +78,8 @@ export default function QueueScreen() {
   };
 
   return (
-    <ScrollView 
-      style={styles.container} 
+    <ScrollView
+      style={styles.container}
       contentContainerStyle={styles.contentContainer}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#1B93D5"]} />
@@ -102,7 +107,7 @@ export default function QueueScreen() {
             <Text style={styles.statusText}>{queueData.status}</Text>
           </View>
         </View>
-        
+
         <View style={styles.ticketContent}>
           <Text style={styles.ticketLabel}>Queue Number</Text>
           <Text style={styles.yourNumber}>{queueData.yourNumber}</Text>
@@ -122,9 +127,9 @@ export default function QueueScreen() {
       </View>
 
       {/* REFRESH BUTTON */}
-      <TouchableOpacity 
-        style={styles.refreshButton} 
-        onPress={onRefresh} 
+      <TouchableOpacity
+        style={styles.refreshButton}
+        onPress={onRefresh}
         activeOpacity={0.8}
         disabled={loading}
       >
@@ -264,7 +269,7 @@ const styles = StyleSheet.create({
     marginVertical: 20,
     borderStyle: 'dashed',
     borderWidth: 1,
-    borderColor: "#E2E8F0", 
+    borderColor: "#E2E8F0",
   },
   estimateContainer: {
     flexDirection: 'row',

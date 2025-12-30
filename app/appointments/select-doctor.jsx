@@ -31,7 +31,14 @@ export default function SelectDoctor() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+
+      {/* HEADER WITH BACK BUTTON */}
       <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#1E293B" />
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
+
         <Text style={styles.title}>Choose a Specialist</Text>
         <Text style={styles.subtitle}>for {service || "Appointment"}</Text>
       </View>
@@ -66,7 +73,7 @@ export default function SelectDoctor() {
                 <Text style={styles.cardSubtitle}>{doc.specialization || "General Dentist"}</Text>
               </View>
 
-              {/* Show Busy Tag if status is Busy (But still clickable) */}
+              {/* Show Busy Tag if status is Busy */}
               {doc.status === 'Busy' && (
                 <View style={styles.busyBadge}>
                   <Text style={styles.busyText}>Busy</Text>
@@ -96,6 +103,23 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 32,
   },
+
+  // Back Button Styles
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+    paddingRight: 10,
+    marginLeft: -4
+  },
+  backText: {
+    fontSize: 16,
+    color: "#1E293B",
+    marginLeft: 6,
+    fontWeight: "600"
+  },
+
   title: {
     fontSize: 28,
     fontWeight: "800",

@@ -70,12 +70,16 @@ export default function FamilyMembers() {
 
   return (
     <View style={styles.page}>
+
+      {/* Header with Back + Text */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1E293B" />
+          <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
+
         <Text style={styles.title}>Family Members</Text>
-        <View style={{ width: 24 }} />
+        <View style={{ width: 60 }} /> {/* Spacer to balance */}
       </View>
 
       <ScrollView
@@ -191,6 +195,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#F4F8FF",
     zIndex: 10
   },
+
+  // Back Button Styles
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    marginLeft: -8
+  },
+  backText: {
+    fontSize: 16,
+    color: "#1E293B",
+    marginLeft: 6,
+    fontWeight: "600"
+  },
+
   title: { fontSize: 22, fontWeight: "700", color: "#1E293B" },
 
   /* CARD */

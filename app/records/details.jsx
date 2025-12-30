@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, Stack } from "expo-router";
+import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { API, fetchPatientByEmail } from "../../constants/Api";
 import { useUser } from "@clerk/clerk-expo";
@@ -12,6 +12,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 export default function RecordDetails() {
   const { id } = useLocalSearchParams();
   const { user } = useUser();
+  const router = useRouter();
 
   const [record, setRecord] = useState(null);
   const [medications, setMedications] = useState([]);
@@ -69,13 +70,9 @@ export default function RecordDetails() {
         }
       }
 
-      // 2. Construct File Path (Using Legacy Directory)
-      // Fallback to documentDirectory if cacheDirectory is missing (rare edge case)
+      // 2. Construct File Path
       const baseDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
-
-      if (!baseDir) {
-        throw new Error("Storage directory not available on this device.");
-      }
+      if (!baseDir) throw new Error("Storage directory not available.");
 
       const fileName = `Medical_Record_${id}.${extension}`;
       const fileUri = baseDir + fileName;
@@ -120,9 +117,19 @@ export default function RecordDetails() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Stack.Screen options={{ headerTitle: "Details", headerStyle: { backgroundColor: '#F8FAFC' }, headerShadowVisible: false }} />
+      {/* Hide default header, we use custom one below */}
+      <Stack.Screen options={{ headerShown: false }} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+
+        {/* CUSTOM HEADER WITH BACK BUTTON */}
+        <View style={styles.customHeader}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#1E293B" />
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Record Details</Text>
+        </View>
 
         <View style={styles.headerSection}>
           <View style={styles.providerAvatar}>
@@ -209,6 +216,24 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   scrollContent: { padding: 20 },
+
+  // Header Styles
+  customHeader: { marginBottom: 24, paddingBottom: 10 },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+    paddingRight: 10,
+    marginLeft: -4
+  },
+  backText: {
+    fontSize: 16,
+    color: "#1E293B",
+    marginLeft: 6,
+    fontWeight: "600"
+  },
+  headerTitle: { fontSize: 24, fontWeight: "800", color: "#1E293B" },
 
   headerSection: { flexDirection: "row", alignItems: "center", marginBottom: 24 },
   providerAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#E0F2FE", justifyContent: "center", alignItems: "center", marginRight: 12, borderWidth: 1, borderColor: "#BAE6FD" },

@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { API } from "../../constants/Api";
@@ -49,7 +49,7 @@ export default function AppointmentDetails() {
       </View>
     );
   }
-  
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'Done': return { bg: '#DCFCE7', text: '#166534' }; // Green
@@ -63,9 +63,14 @@ export default function AppointmentDetails() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      
+
       {/* Header with Back Button */}
       <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#1E293B" />
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
+
         <Text style={styles.title}>Appointment Details</Text>
       </View>
 
@@ -86,15 +91,15 @@ export default function AppointmentDetails() {
 
         {/* Main Details Grid */}
         <View style={styles.grid}>
-          <DetailItem 
-            icon="clipboard-outline" 
-            label="Service" 
-            value={appointment.procedure || "Dental Checkup"} 
+          <DetailItem
+            icon="clipboard-outline"
+            label="Service"
+            value={appointment.procedure || "Dental Checkup"}
           />
-          <DetailItem 
-            icon="medkit-outline" 
-            label="Doctor" 
-            value={appointment.dentist_name || appointment.dentist || "Unassigned"} 
+          <DetailItem
+            icon="medkit-outline"
+            label="Doctor"
+            value={appointment.dentist_name || appointment.dentist || "Unassigned"}
           />
           <DetailItem
             icon="calendar-outline"
@@ -147,9 +152,9 @@ const DetailItem = ({ icon, label, value }) => (
 );
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: "#F8FAFC" 
+  container: {
+    flex: 1,
+    backgroundColor: "#F8FAFC"
   },
   contentContainer: {
     padding: 24,
@@ -163,9 +168,26 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 24,
   },
-  title: { 
-    fontSize: 28, 
-    fontWeight: "800", 
+
+  // Back Button Styles
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+    paddingRight: 10,
+    marginLeft: -4
+  },
+  backText: {
+    fontSize: 16,
+    color: "#1E293B",
+    marginLeft: 6,
+    fontWeight: "600"
+  },
+
+  title: {
+    fontSize: 28,
+    fontWeight: "800",
     color: '#1E293B',
     letterSpacing: -0.5,
   },
@@ -174,7 +196,7 @@ const styles = StyleSheet.create({
     color: "#64748B",
     marginBottom: 10,
   },
-  
+
   /* CARD STYLES */
   card: {
     backgroundColor: "white",
@@ -220,7 +242,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F1F5F9",
     marginBottom: 24,
   },
-  
+
   /* GRID & DETAILS */
   grid: {
     gap: 20,
@@ -241,17 +263,17 @@ const styles = StyleSheet.create({
   detailTextContainer: {
     flex: 1,
   },
-  label: { 
-    fontSize: 13, 
+  label: {
+    fontSize: 13,
     color: "#64748B",
     fontWeight: "500",
     marginBottom: 2,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  value: { 
-    fontSize: 16, 
-    fontWeight: "700", 
+  value: {
+    fontSize: 16,
+    fontWeight: "700",
     color: "#1E293B",
   },
 

@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:4006"; 
+const API_BASE_URL = "http://192.168.1.5:4006"; 
 
 export const API = {
   patients: `${API_BASE_URL}/api/patients`,
