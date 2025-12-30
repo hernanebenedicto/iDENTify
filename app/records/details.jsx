@@ -151,7 +151,18 @@ export default function RecordDetails() {
             </View>
           </View>
           <Text style={styles.procedureTitle}>{record.procedure_text}</Text>
+
           <View style={styles.divider} />
+
+          {/* --- PRICING DISPLAY ADDED HERE --- */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Text style={{ fontSize: 16, color: '#64748B', fontWeight: '500' }}>Amount Paid:</Text>
+            <Text style={{ fontSize: 20, color: '#0f766e', fontWeight: '800' }}>
+              {record.price ? `₱${record.price}` : "₱0.00"}
+            </Text>
+          </View>
+          {/* ---------------------------------- */}
+
           <View style={styles.metaItem}>
             <Ionicons name="time-outline" size={16} color="#6B7280" />
             <Text style={styles.metaText}>{record.start_time || "Date N/A"}</Text>
