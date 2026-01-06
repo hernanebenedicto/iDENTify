@@ -12,15 +12,21 @@ import {
 } from "react-native";
 import { useSignUp } from "@clerk/clerk-expo";
 import { Link, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { API } from "../../constants/Api";
 
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
   const router = useRouter();
 
-  const [fullName, setFullName] = useState("");
+  // Split Name State
+  const [firstName, setFirstName] = useState("");
+  const [middleName, setMiddleName] = useState("");
+  const [lastName, setLastName] = useState("");
+
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
   const [code, setCode] = useState("");
 
@@ -28,8 +34,8 @@ export default function SignUpScreen() {
   const onSignUpPress = async () => {
     if (!isLoaded) return;
 
-    if (!fullName.trim()) {
-      Alert.alert("Error", "Please enter your full name.");
+    if (!firstName.trim() || !lastName.trim()) {
+      Alert.alert("Error", "Please enter your first and last name.");
       return;
     }
 
@@ -37,8 +43,8 @@ export default function SignUpScreen() {
       await signUp.create({
         emailAddress: emailAddress.trim(),
         password,
-        firstName: fullName.split(" ")[0],
-        lastName: fullName.split(" ").slice(1).join(" "),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
       });
 
       await signUp.prepareEmailAddressVerification({
@@ -64,15 +70,16 @@ export default function SignUpScreen() {
       if (signUpAttempt.status === "complete") {
 
         // --- BACKEND CONNECTION START ---
-        // Create the patient in your MySQL database now that they are verified
         try {
           const res = await fetch(API.patients, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              full_name: fullName,
+              first_name: firstName.trim(),
+              middle_name: middleName.trim(),
+              last_name: lastName.trim(),
               email: emailAddress.trim(),
-              address: "Update your profile", // Default value
+              address: "Update your profile",
               contact_number: "",
               gender: "Unspecified"
             })
@@ -80,7 +87,6 @@ export default function SignUpScreen() {
 
           if (!res.ok) {
             console.error("Failed to create patient in DB");
-            // We alert but still allow login because Clerk Auth succeeded
             Alert.alert("Notice", "Account created, but profile setup failed. Please contact support.");
           }
         } catch (dbError) {
@@ -139,10 +145,25 @@ export default function SignUpScreen() {
           <Text style={styles.appName}>iDENTify</Text>
           <Text style={styles.title}>Create Account</Text>
 
+          {/* Stacked Name Inputs */}
           <TextInput
-            value={fullName}
-            placeholder="Full Name"
-            onChangeText={setFullName}
+            value={firstName}
+            placeholder="First Name"
+            onChangeText={setFirstName}
+            style={styles.input}
+          />
+
+          <TextInput
+            value={middleName}
+            placeholder="Middle Name (Optional)"
+            onChangeText={setMiddleName}
+            style={styles.input}
+          />
+
+          <TextInput
+            value={lastName}
+            placeholder="Last Name"
+            onChangeText={setLastName}
             style={styles.input}
           />
 
@@ -156,15 +177,28 @@ export default function SignUpScreen() {
             style={styles.input}
           />
 
-          <TextInput
-            value={password}
-            placeholder="Enter password"
-            secureTextEntry={true}
-            onChangeText={setPassword}
-            style={styles.input}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+          <View style={styles.passwordContainer}>
+            <TextInput
+              value={password}
+              placeholder="Enter password"
+              secureTextEntry={!showPassword}
+              onChangeText={setPassword}
+              style={[styles.input, styles.passwordInput]}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              onPress={() => setShowPassword(!showPassword)}
+              style={styles.eyeIcon}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name={showPassword ? "eye-off" : "eye"}
+                size={24}
+                color="#666"
+              />
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity style={styles.button} onPress={onSignUpPress}>
             <Text style={styles.buttonText}>Sign Up</Text>
@@ -233,6 +267,22 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 3,
   },
+
+  /* Password Styles */
+  passwordContainer: {
+    width: "100%",
+    position: "relative",
+  },
+  passwordInput: {
+    paddingRight: 50, // Space for the eye icon
+  },
+  eyeIcon: {
+    position: "absolute",
+    right: 16,
+    top: 14, // Aligned with input padding
+    zIndex: 1,
+  },
+
   button: {
     backgroundColor: "#1A7FCC",
     paddingVertical: 15,

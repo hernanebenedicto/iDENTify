@@ -1,5 +1,6 @@
 import { useSignIn } from "@clerk/clerk-expo";
 import { Link, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import {
   Text,
   TextInput,
@@ -18,6 +19,7 @@ export default function Page() {
 
   const [emailAddress, setEmailAddress] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [showPassword, setShowPassword] = React.useState(false);
 
   const onSignInPress = async () => {
     if (!isLoaded) return;
@@ -64,15 +66,28 @@ export default function Page() {
             onChangeText={setEmailAddress}
           />
 
-          <TextInput
-            value={password}
-            placeholder="Enter password"
-            secureTextEntry={true}
-            style={styles.input}
-            onChangeText={setPassword}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+          <View style={styles.passwordContainer}>
+            <TextInput
+              value={password}
+              placeholder="Enter password"
+              secureTextEntry={!showPassword}
+              style={[styles.input, styles.passwordInput]}
+              onChangeText={setPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              onPress={() => setShowPassword(!showPassword)}
+              style={styles.eyeIcon}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name={showPassword ? "eye-off" : "eye"}
+                size={24}
+                color="#666"
+              />
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity onPress={onSignInPress} style={styles.button}>
             <Text style={styles.buttonText}>Sign In</Text>
@@ -130,6 +145,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.07,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 3,
+  },
+
+  /* New Password Styles */
+  passwordContainer: {
+    width: "100%",
+    position: "relative",
+  },
+  passwordInput: {
+    paddingRight: 50, // Space for the eye icon
+  },
+  eyeIcon: {
+    position: "absolute",
+    right: 16,
+    top: 14, // Aligned with input padding
+    zIndex: 1,
   },
 
   button: {
