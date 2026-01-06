@@ -1,7 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useEffect, useCallback } from "react";
-// Fixed import path: relative path instead of alias
 import { API, fetchPatientByEmail } from "../../constants/Api";
 import { useUser } from "@clerk/clerk-expo";
 import { useFocusEffect } from "expo-router";
@@ -19,7 +18,10 @@ export default function QueueScreen() {
 
   const fetchQueue = async () => {
     if (!user?.primaryEmailAddress?.emailAddress) return;
-    if (!refreshing) setLoading(true);
+
+    // Only show full loading spinner on initial load or manual refresh, not auto-focus
+    if (!refreshing && queueData.status === "Not In Queue") setLoading(true);
+
     try {
       const me = await fetchPatientByEmail(user.primaryEmailAddress.emailAddress);
 
@@ -37,14 +39,14 @@ export default function QueueScreen() {
       const data = await res.json();
 
       setQueueData({
-        // Use the calculated list position (servingNumber) instead of the DB ID
+        // Map backend 'servingNumber' (Now Serving) to UI 'currentNumber'
         currentNumber: data.servingNumber ? String(data.servingNumber).padStart(2, '0') : "—",
 
-        // Use the calculated list position (myNumber) instead of the DB ID
+        // Map backend 'myNumber' (Your Ticket) to UI 'yourNumber'
         yourNumber: data.myNumber ? String(data.myNumber).padStart(2, '0') : "—",
 
         status: data.myStatus ? data.myStatus.status : "Not In Queue",
-        estimate: data.myStatus ? data.estimatedWaitTime : "—",
+        estimate: (data.myStatus && data.estimatedWaitTime) ? data.estimatedWaitTime : "—",
       });
 
     } catch (error) {
@@ -68,12 +70,23 @@ export default function QueueScreen() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "Serving": return "#22C55E"; // Green
-      case "On Chair": return "#22C55E"; // Green (added to match web status)
-      case "Near": return "#F59E0B"; // Orange
-      case "Waiting": return "#3B82F6"; // Blue
-      case "Done": return "#10B981"; // Emerald
-      default: return "#64748B"; // Gray
+      case "On Chair":
+      case "Serving":
+      case "Treatment":
+        return "#22C55E"; // Green
+      case "Payment / Billing":
+      case "Near":
+        return "#F59E0B"; // Orange
+      case "Checked-In":
+      case "Waiting":
+        return "#3B82F6"; // Blue
+      case "Done":
+        return "#10B981"; // Emerald
+      case "Cancelled":
+      case "No-Show":
+        return "#EF4444"; // Red
+      default:
+        return "#64748B"; // Gray
     }
   };
 
