@@ -1,13 +1,15 @@
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, Stack, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { API, fetchPatientByEmail } from "../../constants/Api";
 import { useUser } from "@clerk/clerk-expo";
 import * as Sharing from 'expo-sharing';
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import * as FileSystem from 'expo-file-system/legacy';
+
+// --- IMPORT FROM CONSTANTS ---
+import { dentalServices } from "../../constants/services";
 
 export default function RecordDetails() {
   const { id } = useLocalSearchParams();
@@ -29,6 +31,8 @@ export default function RecordDetails() {
         if (recordRes.ok) {
           const recordData = await recordRes.json();
           setRecord(recordData);
+        } else {
+          console.error("Failed to fetch record:", recordRes.status);
         }
 
         const patient = await fetchPatientByEmail(user.primaryEmailAddress.emailAddress);
@@ -57,7 +61,6 @@ export default function RecordDetails() {
     try {
       setDownloading(true);
 
-      // 1. Detect correct extension and mime type
       let extension = "jpg";
       let mimeType = "image/jpeg";
 
@@ -70,14 +73,12 @@ export default function RecordDetails() {
         }
       }
 
-      // 2. Construct File Path
       const baseDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
       if (!baseDir) throw new Error("Storage directory not available.");
 
       const fileName = `Medical_Record_${id}.${extension}`;
       const fileUri = baseDir + fileName;
 
-      // 3. Write file
       if (record.image_url.startsWith('data:')) {
         const base64Code = record.image_url.split('base64,')[1];
         await FileSystem.writeAsStringAsync(fileUri, base64Code, { encoding: 'base64' });
@@ -85,7 +86,6 @@ export default function RecordDetails() {
         await FileSystem.downloadAsync(record.image_url, fileUri);
       }
 
-      // 4. Share/Save
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri, {
           mimeType: mimeType,
@@ -103,6 +103,23 @@ export default function RecordDetails() {
     }
   };
 
+  // --- Breakdown Logic (Fixed property name) ---
+  const breakdown = useMemo(() => {
+    if (!record || !record.procedure_text) return [];
+
+    // Split the comma-separated procedures
+    const items = record.procedure_text.split(',').map(s => s.trim()).filter(Boolean);
+
+    return items.map(item => {
+      // Look up price using 'title' instead of 'name'
+      const service = dentalServices.find(s => s.title === item);
+      return {
+        name: item,
+        priceText: service ? service.price : "Variable" // Fallback if not found
+      };
+    });
+  }, [record]);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -111,18 +128,31 @@ export default function RecordDetails() {
     );
   }
 
-  if (!record) return null;
+  if (!record) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.customHeader}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#1E293B" />
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: '#64748B' }}>Record not found.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const hasFile = !!record.image_url;
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Hide default header, we use custom one below */}
       <Stack.Screen options={{ headerShown: false }} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-
-        {/* CUSTOM HEADER WITH BACK BUTTON */}
+        {/* CUSTOM HEADER */}
         <View style={styles.customHeader}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#1E293B" />
@@ -150,20 +180,21 @@ export default function RecordDetails() {
               <Text style={styles.statusText}>Completed</Text>
             </View>
           </View>
-          <Text style={styles.procedureTitle}>{record.procedure_text}</Text>
 
+          <Text style={styles.sectionTitle}>Procedures & Fees</Text>
           <View style={styles.divider} />
 
-          {/* --- PRICING DISPLAY ADDED HERE --- */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <Text style={{ fontSize: 16, color: '#64748B', fontWeight: '500' }}>Amount Paid:</Text>
-            <Text style={{ fontSize: 20, color: '#0f766e', fontWeight: '800' }}>
-              {record.price ? `₱${record.price}` : "₱0.00"}
-            </Text>
+          {/* --- PROCEDURE BREAKDOWN LIST --- */}
+          <View style={styles.breakdownContainer}>
+            {breakdown.map((item, index) => (
+              <View key={index} style={styles.breakdownRow}>
+                <Text style={styles.breakdownName}>{item.name}</Text>
+                <Text style={styles.breakdownPrice}>{item.priceText}</Text>
+              </View>
+            ))}
           </View>
-          {/* ---------------------------------- */}
 
-          <View style={styles.metaItem}>
+          <View style={[styles.metaItem, { marginTop: 16 }]}>
             <Ionicons name="time-outline" size={16} color="#6B7280" />
             <Text style={styles.metaText}>{record.start_time || "Date N/A"}</Text>
           </View>
@@ -227,25 +258,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAFC" },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   scrollContent: { padding: 20 },
-
-  // Header Styles
   customHeader: { marginBottom: 24, paddingBottom: 10 },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    marginBottom: 10,
-    paddingRight: 10,
-    marginLeft: -4
-  },
-  backText: {
-    fontSize: 16,
-    color: "#1E293B",
-    marginLeft: 6,
-    fontWeight: "600"
-  },
+  backButton: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginBottom: 10, paddingRight: 10, marginLeft: -4 },
+  backText: { fontSize: 16, color: "#1E293B", marginLeft: 6, fontWeight: "600" },
   headerTitle: { fontSize: 24, fontWeight: "800", color: "#1E293B" },
-
   headerSection: { flexDirection: "row", alignItems: "center", marginBottom: 24 },
   providerAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#E0F2FE", justifyContent: "center", alignItems: "center", marginRight: 12, borderWidth: 1, borderColor: "#BAE6FD" },
   avatarText: { fontSize: 20, fontWeight: "700", color: "#0284C7" },
@@ -253,30 +269,32 @@ const styles = StyleSheet.create({
   providerName: { fontSize: 18, fontWeight: "700", color: "#111827" },
 
   mainCard: { backgroundColor: "#FFFFFF", borderRadius: 20, padding: 20, shadowOpacity: 0.05, elevation: 4, marginBottom: 24 },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
   iconCircle: { width: 40, height: 40, borderRadius: 12, backgroundColor: "#F0F9FF", justifyContent: "center", alignItems: "center" },
   statusBadge: { backgroundColor: "#ECFDF5", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   statusText: { color: "#059669", fontSize: 12, fontWeight: "600" },
-  procedureTitle: { fontSize: 22, fontWeight: "800", color: "#1F2937", marginBottom: 16 },
-  divider: { height: 1, backgroundColor: "#F3F4F6", marginBottom: 16 },
-  metaItem: { flexDirection: "row", alignItems: "center" },
-  metaText: { marginLeft: 6, color: "#4B5563", fontSize: 14, fontWeight: "500" },
 
+  // New Styles for Breakdown
+  sectionTitle: { fontSize: 14, fontWeight: '600', color: '#94A3B8', marginTop: 10, marginBottom: 8, textTransform: 'uppercase' },
+  breakdownContainer: { marginBottom: 8 },
+  breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  breakdownName: { fontSize: 15, color: '#334155', flex: 1, paddingRight: 10 },
+  breakdownPrice: { fontSize: 15, color: '#64748B', fontWeight: '500' },
+
+  divider: { height: 1, backgroundColor: "#F1F5F9", marginVertical: 12 },
+  metaItem: { flexDirection: "row", alignItems: "center" },
+  metaText: { marginLeft: 6, color: "#94A3B8", fontSize: 14, fontWeight: "500" },
   sectionHeader: { fontSize: 16, fontWeight: "700", color: "#374151", marginBottom: 12, marginLeft: 4 },
   notesContainer: { backgroundColor: "#FFF", padding: 16, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: "#1B93D5", marginBottom: 24, elevation: 2 },
   notesText: { fontSize: 15, color: "#4B5563", lineHeight: 24 },
-
   attachmentCard: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", padding: 12, borderRadius: 12, borderWidth: 1, borderColor: "#E5E7EB" },
   fileIconBox: { width: 40, height: 40, borderRadius: 8, backgroundColor: "#EF4444", justifyContent: "center", alignItems: "center" },
   attachmentInfo: { flex: 1, marginLeft: 12 },
   attachmentName: { fontSize: 15, fontWeight: "600", color: "#1F2937" },
   attachmentSize: { fontSize: 12, color: "#9CA3AF" },
-
   emptyStateBox: { padding: 16, alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 12, borderStyle: 'dashed', borderWidth: 1, borderColor: '#D1D5DB' },
   emptyStateText: { color: '#9CA3AF', fontStyle: 'italic' },
-
   dividerLarge: { height: 1, backgroundColor: "#E2E8F0", marginVertical: 30 },
-
   medCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', padding: 12, borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' },
   medName: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
   medDetails: { fontSize: 13, color: '#64748B' }
